@@ -1,0 +1,29 @@
+name: smartquote_mobile
+description: "A new Flutter project."
+
+version: 1.0.0+1
+
+environment:
+  sdk: ^3.13.3
+
+dependencies:
+  flutter:
+    sdk: flutter
+  dio: ^5.3.3  # Para peticiones HTTP
+  provider: ^6.1.1 # Para inyección de dependencias y MVVM
+  intl: ^0.18.1 # Para formateo de fechas
+  shared_preferences: ^2.2.2 # Para guardar el token de forma sencilla (o flutter_secure_storage)
+
+  cupertino_icons: ^1.0.8
+
+dev_dependencies:
+  flutter_test:
+    sdk: flutter
+
+
+  flutter_lints: ^6.0.0
+
+flutter:
+  uses-material-design: true
+
+ 
