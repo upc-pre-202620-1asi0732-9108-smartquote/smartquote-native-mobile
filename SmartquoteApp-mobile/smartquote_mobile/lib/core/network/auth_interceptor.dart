@@ -9,7 +9,7 @@ class AuthInterceptor extends Interceptor {
     // final token = prefs.getString('access_token');
     
     // Para pruebas, asumimos un token estático o que el endpoint no lo requiere si estás probando
-    String? token = "TU_TOKEN_JWT_AQUI"; 
+    String? token = "ACÁ VA TU TOKE"; //ACÁ VA TU TOKEN DE TU BACKEND Y ASEGURATE DE TENER PERMISOS DE CORS TAMBIEN XD 
     
     if (token != null) {
       options.headers['Authorization'] = 'Bearer $token';

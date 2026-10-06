@@ -2,6 +2,8 @@ import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'package:intl/intl.dart';
 import '../viewmodels/request_list_viewmodel.dart';
+import 'new_request_screen.dart';
+import 'notifications_screen.dart';
 
 class RequestListScreen extends StatefulWidget {
   @override
@@ -33,7 +35,9 @@ class _RequestListScreenState extends State<RequestListScreen> {
           Padding(
             padding: const EdgeInsets.all(8.0),
             child: ElevatedButton.icon(
-              onPressed: () {}, // Navegar a nueva solicitud después
+              onPressed: () {
+                Navigator.push(context, MaterialPageRoute(builder: (context) => NewRequestScreen()));
+                }, // Navegar a nueva solicitud después
               icon: const Icon(Icons.add),
               label: const Text('Nueva solicitud'),
               style: ElevatedButton.styleFrom(backgroundColor: const Color(0xFF0056B3)),
@@ -50,12 +54,17 @@ class _RequestListScreenState extends State<RequestListScreen> {
             ListTile(
               leading: const Icon(Icons.inbox, color: Colors.white),
               title: const Text('Solicitudes de compra', style: TextStyle(color: Colors.white)),
-              onTap: () {},
+              onTap: () {
+                Navigator.pop(context); // Cierra el menú lateral
+              },
             ),
             ListTile(
               leading: const Icon(Icons.notifications, color: Colors.white),
               title: const Text('Notificaciones', style: TextStyle(color: Colors.white)),
-              onTap: () {},
+              onTap: () {
+                Navigator.pop(context); // Cierra el menú lateral
+                Navigator.push(context, MaterialPageRoute(builder: (_) => NotificationsScreen()));
+              },
             ),
           ],
         ),

@@ -4,5 +4,6 @@ import '../entities/notification.dart';
 abstract class SmartQuoteRepository {
   Future<List<PurchaseRequest>> getPurchaseRequests();
   Future<List<AppNotification>> getNotifications();
-  // Agregaremos el POST createRequest luego
+  Future<bool> markNotificationAsRead(String notificationId);
+  Future<bool> createPurchaseRequest(Map<String, dynamic> requestData);
 }
