@@ -1,7 +1,7 @@
 name: smartquote_mobile
-description: "A new Flutter project."
+description: "SmartQuote mobile client for the poultry purchasing workflow."
 
-version: 1.0.0+1
+version: 1.1.0+2
 
 environment:
   sdk: ^3.13.3
@@ -9,10 +9,14 @@ environment:
 dependencies:
   flutter:
     sdk: flutter
-  dio: ^5.3.3  # Para peticiones HTTP
-  provider: ^6.1.1 # Para inyección de dependencias y MVVM
-  intl: ^0.18.1 # Para formateo de fechas
-  shared_preferences: ^2.2.2 # Para guardar el token de forma sencilla (o flutter_secure_storage)
+  dio: ^5.9.0
+  intl: ^0.20.2
+  cookie_jar: ^4.0.8
+  dio_cookie_manager: ^3.3.0
+  file_picker: ^13.1.0
+  pdf: ^3.11.3
+  printing: ^5.14.2
+  url_launcher: ^6.3.2
 
   cupertino_icons: ^1.0.8
 
@@ -25,5 +29,14 @@ dev_dependencies:
 
 flutter:
   uses-material-design: true
+  assets:
+    - assets/fonts/Roboto-Regular.ttf
+    - assets/fonts/Roboto-Bold.ttf
+  fonts:
+    - family: Roboto
+      fonts:
+        - asset: assets/fonts/Roboto-Regular.ttf
+          weight: 400
+        - asset: assets/fonts/Roboto-Bold.ttf
+          weight: 700
 
- 
