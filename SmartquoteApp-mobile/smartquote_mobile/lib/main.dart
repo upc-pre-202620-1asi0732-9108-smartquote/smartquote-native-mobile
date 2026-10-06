@@ -1,17 +1,12 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
-
-// Repositorio
 import 'data/repositories_impl/smartquote_repository_impl.dart';
-
-// ViewModels
 import 'presentation/viewmodels/request_list_viewmodel.dart';
 import 'presentation/viewmodels/new_request_viewmodel.dart';
 import 'presentation/viewmodels/notification_viewmodel.dart';
-
-// Pantalla Principal
 import 'presentation/screens/request_list_screen.dart';
-
+import 'presentation/viewmodels/login_viewmodel.dart';
+import 'presentation/screens/login_screen.dart';
 void main() {
   runApp(const SmartQuoteApp());
 }
@@ -32,6 +27,7 @@ class SmartQuoteApp extends StatelessWidget {
         ChangeNotifierProvider(
           create: (_) => NotificationViewModel(repository: SmartQuoteRepositoryImpl()),
         ),
+        ChangeNotifierProvider(create: (_) => LoginViewModel(repository: SmartQuoteRepositoryImpl())),
       ],
       child: MaterialApp(
         title: 'SmartQuote App',
@@ -40,7 +36,7 @@ class SmartQuoteApp extends StatelessWidget {
           primarySwatch: Colors.blue,
           fontFamily: 'Roboto',
         ),
-        home: RequestListScreen(),
+        home: LoginScreen(),
       ),
     );
   }

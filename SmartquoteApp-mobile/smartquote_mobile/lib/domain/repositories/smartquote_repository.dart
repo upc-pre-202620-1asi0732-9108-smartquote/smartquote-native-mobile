@@ -6,4 +6,5 @@ abstract class SmartQuoteRepository {
   Future<List<AppNotification>> getNotifications();
   Future<bool> markNotificationAsRead(String notificationId);
   Future<bool> createPurchaseRequest(Map<String, dynamic> requestData);
+  Future<bool> login(String email, String password);
 }

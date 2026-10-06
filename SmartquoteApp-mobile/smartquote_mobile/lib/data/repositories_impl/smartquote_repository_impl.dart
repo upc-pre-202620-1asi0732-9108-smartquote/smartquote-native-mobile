@@ -4,6 +4,7 @@ import '../../domain/entities/notification.dart';
 import '../../domain/repositories/smartquote_repository.dart';
 import '../models/purchase_request_model.dart';
 import '../models/notification_model.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 
 class SmartQuoteRepositoryImpl implements SmartQuoteRepository {
   @override
@@ -53,6 +54,23 @@ class SmartQuoteRepositoryImpl implements SmartQuoteRepository {
       return response.statusCode == 201;
     } catch (e) {
       throw Exception('Error al crear la solicitud: $e');
+    }
+  }
+
+  @override
+  Future<bool> login(String email, String password) async {
+    try {
+      final response = await DioClient.instance.post('/iam/auth/login', data: {
+        "email": email,
+        "password": password
+      });
+      // Guardar el token en el dispositivo
+      final token = response.data['accessToken'];
+      final prefs = await SharedPreferences.getInstance();
+      await prefs.setString('access_token', token);
+      return true;
+    } catch (e) {
+      return false;
     }
   }
 }
