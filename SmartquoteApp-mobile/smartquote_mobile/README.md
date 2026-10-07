@@ -58,11 +58,17 @@ En Android emulado usar `http://10.0.2.2:8080`; en un teléfono físico, la IP L
 
 ```powershell
 flutter analyze
-flutter test
+./tool/run-tests.ps1
+./tool/run-tests.ps1 -Story US07
+./tool/run-tests.ps1 -Level Integration
 flutter build web --release --dart-define=API_BASE_URL=https://smartquote-api-h8czffe5b4dtg6d7.chilecentral-01.azurewebsites.net
 ```
 
-[Guía por rol, trazabilidad de historias, pruebas contra API real y pendientes](docs/REFACTORIZACION-MOVIL.md).
+`-Level Integration` necesita Docker Desktop y el backend en `E:\smartquote-web-services`: levanta una API/base temporales y ejecuta el flujo HTTP completo, con login real y PDF. No modifica Azure ni la base de demostración. La extracción usa Stub; SUNAT se comprueba mediante contratos controlados y las pruebas del backend.
+
+Para ejecutar el mismo flujo de repositorios/PDF en Android conectado: `./tool/run-tests.ps1 -Level Android -Device ID_DE_FLUTTER_DEVICES` (`adb` en PATH). Usa y elimina un túnel `adb reverse`. Es distinto a los tests de widgets y a una prueba en Chrome. Los valores `SMARTQUOTE_TEST_*` son exclusivamente configuración efímera de esta prueba, nunca credenciales de producción.
+
+En GitHub, publicar primero el backend con `tests/run-tests.ps1` y configurar **Settings → Secrets and variables → Actions → Variables**: `SMARTQUOTE_BACKEND_TEST_REF` con el SHA completo (40 caracteres) de esa revisión. CI incluye integración HTTP obligatoria; Android conectado se ejecuta por separado.
 
 SUNAT ya se utiliza dentro de la simulación del backend. Flutter muestra la tasa/procedencia recibida; no consulta SUNAT directamente ni incluye sus credenciales.
 

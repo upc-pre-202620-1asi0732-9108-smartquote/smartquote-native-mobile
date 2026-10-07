@@ -10,7 +10,8 @@ import 'package:smartquote_mobile/identity_access/application/session_controller
 import 'support/fixtures.dart';
 
 void main() {
-  test('Real local HTTP transport sends JWT, multipart and refresh cookie, retrying only a 401', () async {
+  // TS02 E1 E2 TS04 E1: Real local HTTP transport sends JWT, multipart and refresh cookie, retrying only a 401.
+  test('TS02 E1 E2 TS04 E1 — Real local HTTP transport sends JWT, multipart and refresh cookie, retrying only a 401', () async {
     final server = await HttpServer.bind(InternetAddress.loopbackIPv4, 0);
     addTearDown(() => server.close(force: true));
     var sessions = 0, protectedCalls = 0;

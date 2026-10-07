@@ -6,25 +6,62 @@ import 'package:smartquote_mobile/supply_requests/domain/purchase_request.dart';
 import 'support/fixtures.dart';
 
 void main() {
-  test(
-    'US15 preserves supplier history and summary from the same API response',
-    () async {
-      final api = TestApi();
-      final services = testServices(api);
-      addTearDown(services.auth.dispose);
-      final expected = supplierPerformanceFixture();
-      api.responses['/suppliers/20123456789/performance'] = expected;
-      final result = await services.orders.performance('20123456789');
-      expect(result, expected);
-      final history = objectsOf(result['evaluations']);
-      expect(history.single['purchaseOrderId'], orderId);
-      expect(history.single['evaluatedBy'], userId);
-      expect(history.single['observations'], 'Entrega completa sin daños.');
-      expect(api.calls.single.path, '/suppliers/20123456789/performance');
-    },
-  );
+  // TS03/E1-E3: el móvil conserva la conversión y la tasa entregadas por backend.
+  // No consulta SUNAT directamente ni genera una tasa alternativa ante 503.
+  test('TS03 E1 E2 E3 — USD comparison retains original amounts and rate trace across reload, rejects unavailable source', () async {
+    final api = TestApi();
+    final services = testServices(api);
+    addTearDown(services.auth.dispose);
+    final expected = runFixture();
+    expected['evaluations'] = [
+      {
+        'quotationId': quoteId,
+        'originalCurrency': 'USD',
+        'originalTotal': 1000,
+        'comparisonCurrency': 'PEN',
+        'comparisonTotal': 3400,
+        'conversionApplied': true,
+        'isEligible': true,
+      },
+    ];
+    api.responses['/evaluation-scenarios/$scenarioId/simulations'] = expected;
+    api.responses['/simulations/$runId'] = expected;
+    final run = await services.evaluations.simulate(scenarioId);
+    expect(run.evaluations.single['originalTotal'], 1000);
+    expect(run.evaluations.single['originalCurrency'], 'USD');
+    expect(run.evaluations.single['comparisonTotal'], 3400);
+    expect(run.evaluations.single['comparisonCurrency'], 'PEN');
+    expect(run.exchangeRate!['rate'], 3.4);
+    expect(
+      (await services.evaluations.getSimulation(run.id)).exchangeRate,
+      run.exchangeRate,
+    );
+    api.failures['/evaluation-scenarios/$scenarioId/simulations'] =
+        const ApiFailure('Official source unavailable', status: 503);
+    await expectLater(
+      services.evaluations.simulate(scenarioId),
+      throwsA(isA<ApiFailure>().having((e) => e.status, 'status', 503)),
+    );
+    expect(api.calls.every((c) => c.path.startsWith('/')), true);
+  });
+  // US13 E3: preserves supplier history and summary from the same API response.
+  test('US13 E3 — preserves supplier history and summary from the same API response', () async {
+    final api = TestApi();
+    final services = testServices(api);
+    addTearDown(services.auth.dispose);
+    final expected = supplierPerformanceFixture();
+    api.responses['/suppliers/20123456789/performance'] = expected;
+    final result = await services.orders.performance('20123456789');
+    expect(result, expected);
+    final history = objectsOf(result['evaluations']);
+    expect(history.single['purchaseOrderId'], orderId);
+    expect(history.single['evaluatedBy'], userId);
+    expect(history.single['observations'], 'Entrega completa sin daños.');
+    expect(api.calls.single.path, '/suppliers/20123456789/performance');
+  });
 
-  test('US15 accepts 500 characters and rejects longer notes or invalid scores before HTTP', () async {
+  // US13 E1 E2: accepts 500 characters and rejects longer notes or invalid scores before HTTP.
+  test('US13 E1 E2 — accepts 500 characters and rejects longer notes or invalid scores before HTTP', () async {
     final api = TestApi();
     final services = testServices(api);
     addTearDown(services.auth.dispose);
@@ -43,7 +80,8 @@ void main() {
     expect((api.calls.single.body as Map)['observations'], 'x' * 500);
   });
 
-  test('Ordering rechecks a current simulation instead of approving a stale snapshot', () async {
+  // US08 E2: Ordering rechecks a current simulation instead of approving a stale snapshot.
+  test('US08 E2 — Ordering rechecks a current simulation instead of approving a stale snapshot', () async {
     final api = TestApi();
     final services = testServices(api);
     addTearDown(services.auth.dispose);
@@ -54,7 +92,8 @@ void main() {
     );
     expect(api.calls.any((c) => c.method == 'POST'), false);
   });
-  test('Concurrent renewals rotate the session only once', () async {
+  // US09 E3: Concurrent renewals rotate the session only once.
+  test('US09 E3 — Concurrent renewals rotate the session only once', () async {
     final api = TestApi();
     final services = testServices(api);
     addTearDown(services.auth.dispose);
@@ -67,7 +106,8 @@ void main() {
     expect(api.calls.where((c) => c.path == '/iam/auth/refresh').length, 1);
     await services.auth.clear();
   });
-  test('Request REST contracts: pagination, decimal body, history, versions and attachments', () async {
+  // US02 E3 US03 E1 E2 E3: Request REST contracts: pagination, decimal body, history, versions and attachments.
+  test('US02 E3 US03 E1 E2 E3 — Request REST contracts: pagination, decimal body, history, versions and attachments', () async {
     final api = TestApi();
     final services = testServices(api);
     addTearDown(services.auth.dispose);
@@ -103,52 +143,46 @@ void main() {
     expect(api.calls.last.path, '/notifications/$userId/read');
     expect(api.calls.last.method, 'PUT');
   });
-  test(
-    'Quotation consumes real IDs, field versions and explicit line mappings',
-    () async {
-      final api = TestApi();
-      final services = testServices(api);
-      addTearDown(services.auth.dispose);
-      expect((await services.quotations.list(requestId)).length, 2);
-      final quote = await services.quotations.upload(
-        requestId,
-        fileFixture(),
-        {},
-      );
-      expect((api.calls.last.body as MultipartPayload).fields, isEmpty);
-      await services.quotations.process(quote.id);
-      final current = await services.quotations.get(quote.id);
-      await services.quotations.correct(
-        current,
-        fieldId,
-        '4.50',
-        'PDF página 1',
-      );
-      expect(api.calls.last.path, '/quotations/$quoteId/fields/$fieldId');
-      expect((api.calls.last.body as Map)['expectedVersion'], current.version);
-      await services.quotations.addSpecification(current, lineId, {
-        'name': 'Proteína mínima',
-        'value': '21',
-        'unitOfMeasure': '%',
-        'sourcePageNumber': 1,
-        'sourceTextReference': 'Proteína 21%',
-        'reason': 'Evidencia',
-      });
-      expect(
-        api.calls.last.path,
-        '/quotations/$quoteId/lines/$lineId/specifications',
-      );
-      await expectLater(
-        services.quotations.confirm(current, {}),
-        throwsA(isA<ApiFailure>()),
-      );
-      await services.quotations.confirm(current, {lineId: itemId});
-      expect((api.calls.last.body as Map)['lineMappings'], [
-        {'lineId': lineId, 'requestedItemId': itemId},
-      ]);
-    },
-  );
-  test('Simulation versions, history, existing exchange-rate trace, no direct SUNAT call', () async {
+  // US04 E1 US05 E1 E2: Quotation consumes real IDs, field versions and explicit line mappings.
+  test('US04 E1 US05 E1 E2 — Quotation consumes real IDs, field versions and explicit line mappings', () async {
+    final api = TestApi();
+    final services = testServices(api);
+    addTearDown(services.auth.dispose);
+    expect((await services.quotations.list(requestId)).length, 2);
+    final quote = await services.quotations.upload(
+      requestId,
+      fileFixture(),
+      {},
+    );
+    expect((api.calls.last.body as MultipartPayload).fields, isEmpty);
+    await services.quotations.process(quote.id);
+    final current = await services.quotations.get(quote.id);
+    await services.quotations.correct(current, fieldId, '4.50', 'PDF página 1');
+    expect(api.calls.last.path, '/quotations/$quoteId/fields/$fieldId');
+    expect((api.calls.last.body as Map)['expectedVersion'], current.version);
+    await services.quotations.addSpecification(current, lineId, {
+      'name': 'Proteína mínima',
+      'value': '21',
+      'unitOfMeasure': '%',
+      'sourcePageNumber': 1,
+      'sourceTextReference': 'Proteína 21%',
+      'reason': 'Evidencia',
+    });
+    expect(
+      api.calls.last.path,
+      '/quotations/$quoteId/lines/$lineId/specifications',
+    );
+    await expectLater(
+      services.quotations.confirm(current, {}),
+      throwsA(isA<ApiFailure>()),
+    );
+    await services.quotations.confirm(current, {lineId: itemId});
+    expect((api.calls.last.body as Map)['lineMappings'], [
+      {'lineId': lineId, 'requestedItemId': itemId},
+    ]);
+  });
+  // US06 E3 US07 E1 TS03 E1 E2: Simulation versions, history, existing exchange-rate trace, no direct SUNAT call.
+  test('US06 E3 US07 E1 TS03 E1 E2 — Simulation versions, history, existing exchange-rate trace, no direct SUNAT call', () async {
     final api = TestApi();
     final services = testServices(api);
     addTearDown(services.auth.dispose);
@@ -176,7 +210,8 @@ void main() {
       throwsA(isA<ApiFailure>().having((e) => e.status, 'status', 503)),
     );
   });
-  test('Order decision, idempotent resource, delivery, evaluation, audit and metrics', () async {
+  // US08 E1 E3 US12 E1 US13 E1 US14 E2: Order decision, idempotent resource, delivery, evaluation, audit and metrics.
+  test('US08 E1 E3 US12 E1 US13 E1 US14 E2 — Order decision, idempotent resource, delivery, evaluation, audit and metrics', () async {
     final api = TestApi();
     final services = testServices(api);
     addTearDown(services.auth.dispose);
@@ -214,7 +249,8 @@ void main() {
     await services.orders.metrics('2026-10-01', '2026-10-05');
     expect(api.calls.last.query, {'from': '2026-10-01', 'to': '2026-10-05'});
   });
-  test('IAM public login/refresh/register, pending approval, current-user and logout', () async {
+  // US09 E1 E3: IAM public login/refresh/register, pending approval, current-user and logout.
+  test('US09 E1 E3 — IAM public login/refresh/register, pending approval, current-user and logout', () async {
     final api = TestApi(role: 'PurchaseManager');
     final services = testServices(api);
     addTearDown(services.auth.dispose);
@@ -238,21 +274,25 @@ void main() {
     await services.auth.logout();
     expect(services.auth.session, null);
   });
-  test('403/409 are not swallowed as optional missing resources', () async {
-    final api = TestApi();
-    final services = testServices(api);
-    addTearDown(services.auth.dispose);
-    api.failures['/purchase-requests/$requestId/purchase-order'] =
-        const ApiFailure('Forbidden', status: 403);
-    await expectLater(
-      services.orders.byRequest(requestId),
-      throwsA(isA<ApiFailure>().having((e) => e.status, 'status', 403)),
-    );
-    api.failures['/purchase-requests/$requestId/evaluation-scenario'] =
-        const ApiFailure('Conflict', status: 409);
-    await expectLater(
-      services.evaluations.current(requestId),
-      throwsA(isA<ApiFailure>().having((e) => e.status, 'status', 409)),
-    );
-  });
+  // TS02 E3 TS04 E2: 403/409 are not swallowed as optional missing resources.
+  test(
+    'TS02 E3 TS04 E2 — 403/409 are not swallowed as optional missing resources',
+    () async {
+      final api = TestApi();
+      final services = testServices(api);
+      addTearDown(services.auth.dispose);
+      api.failures['/purchase-requests/$requestId/purchase-order'] =
+          const ApiFailure('Forbidden', status: 403);
+      await expectLater(
+        services.orders.byRequest(requestId),
+        throwsA(isA<ApiFailure>().having((e) => e.status, 'status', 403)),
+      );
+      api.failures['/purchase-requests/$requestId/evaluation-scenario'] =
+          const ApiFailure('Conflict', status: 409);
+      await expectLater(
+        services.evaluations.current(requestId),
+        throwsA(isA<ApiFailure>().having((e) => e.status, 'status', 409)),
+      );
+    },
+  );
 }

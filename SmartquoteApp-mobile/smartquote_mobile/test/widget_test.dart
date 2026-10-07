@@ -12,39 +12,45 @@ import 'package:smartquote_mobile/purchase_ordering/presentation/management_page
 import 'support/fixtures.dart';
 
 void main() {
-  testWidgets('US15 shows persisted history, order, author and observations', (
-    tester,
-  ) async {
-    final api = TestApi();
-    final services = testServices(api);
-    addTearDown(services.auth.dispose);
-    api.responses['/suppliers/20123456789/performance'] =
-        supplierPerformanceFixture();
-    await tester.pumpWidget(
-      MaterialApp(
-        home: Scaffold(
-          body: ManagementPage(services: services, initialTaxId: '20123456789'),
-        ),
-      ),
-    );
-    await tester.pumpAndSettle();
-    expect(find.text('Evaluaciones registradas: 1'), findsOneWidget);
-    expect(find.text('Promedio general: 4.50 / 5'), findsOneWidget);
-    await tester.ensureVisible(find.byType(ExpansionTile));
-    await tester.tap(find.byType(ExpansionTile));
-    await tester.pumpAndSettle();
-    expect(find.text('Orden: $orderId'), findsOneWidget);
-    expect(find.text('Autor: $userId'), findsOneWidget);
-    expect(
-      find.text('Observaciones: Entrega completa sin daños.'),
-      findsOneWidget,
-    );
-    expect(tester.takeException(), isNull);
-    await tester.pumpWidget(const SizedBox());
-  });
-
+  // US13 E3: shows persisted history, order, author and observations.
   testWidgets(
-    'Field correction keeps evidence and the actual quotation version',
+    'US13 E3 — shows persisted history, order, author and observations',
+    (tester) async {
+      final api = TestApi();
+      final services = testServices(api);
+      addTearDown(services.auth.dispose);
+      api.responses['/suppliers/20123456789/performance'] =
+          supplierPerformanceFixture();
+      await tester.pumpWidget(
+        MaterialApp(
+          home: Scaffold(
+            body: ManagementPage(
+              services: services,
+              initialTaxId: '20123456789',
+            ),
+          ),
+        ),
+      );
+      await tester.pumpAndSettle();
+      expect(find.text('Evaluaciones registradas: 1'), findsOneWidget);
+      expect(find.text('Promedio general: 4.50 / 5'), findsOneWidget);
+      await tester.ensureVisible(find.byType(ExpansionTile));
+      await tester.tap(find.byType(ExpansionTile));
+      await tester.pumpAndSettle();
+      expect(find.text('Orden: $orderId'), findsOneWidget);
+      expect(find.text('Autor: $userId'), findsOneWidget);
+      expect(
+        find.text('Observaciones: Entrega completa sin daños.'),
+        findsOneWidget,
+      );
+      expect(tester.takeException(), isNull);
+      await tester.pumpWidget(const SizedBox());
+    },
+  );
+
+  // US05 E2: Field correction keeps evidence and the actual quotation version.
+  testWidgets(
+    'US05 E2 — Field correction keeps evidence and the actual quotation version',
     (tester) async {
       final api = TestApi(role: 'PurchaseAnalyst');
       final services = testServices(api);
@@ -95,8 +101,9 @@ void main() {
       await tester.pumpWidget(const SizedBox());
     },
   );
+  // US08 E1: Manager approves the actual eligible offer with delivery terms.
   testWidgets(
-    'Manager approves the actual eligible offer with delivery terms',
+    'US08 E1 — Manager approves the actual eligible offer with delivery terms',
     (tester) async {
       final api = TestApi(role: 'PurchaseManager')..status = 'Evaluation';
       final services = testServices(api);
@@ -145,43 +152,46 @@ void main() {
       await tester.pumpWidget(const SizedBox());
     },
   );
-  testWidgets('Unsubmitted criteria changes prevent manager approval', (
-    tester,
-  ) async {
-    final api = TestApi(role: 'PurchaseManager');
-    final services = testServices(api);
-    addTearDown(services.auth.dispose);
-    await services.auth.login('demo@smartquote.local', 'TestOnly!12345');
-    await tester.pumpWidget(
-      MaterialApp(
-        home: Scaffold(
-          body: OrderPanel(
-            services: services,
-            request: PurchaseRequest(requestFixture(status: 'Evaluation')),
-            active: true,
-            pendingCriteria: true,
-            onChanged: () async {},
-            onBusy: (_) {},
+  // US06 E3 US08 E2: Unsubmitted criteria changes prevent manager approval.
+  testWidgets(
+    'US06 E3 US08 E2 — Unsubmitted criteria changes prevent manager approval',
+    (tester) async {
+      final api = TestApi(role: 'PurchaseManager');
+      final services = testServices(api);
+      addTearDown(services.auth.dispose);
+      await services.auth.login('demo@smartquote.local', 'TestOnly!12345');
+      await tester.pumpWidget(
+        MaterialApp(
+          home: Scaffold(
+            body: OrderPanel(
+              services: services,
+              request: PurchaseRequest(requestFixture(status: 'Evaluation')),
+              active: true,
+              pendingCriteria: true,
+              onChanged: () async {},
+              onBusy: (_) {},
+            ),
           ),
         ),
-      ),
-    );
-    await tester.pumpAndSettle();
-    final button = tester.widget<FilledButton>(
-      find.widgetWithText(FilledButton, 'Aprobar y emitir orden'),
-    );
-    expect(button.onPressed, null);
-    expect(
-      api.calls.any(
-        (c) => c.method == 'POST' && c.path.endsWith('/purchase-orders'),
-      ),
-      false,
-    );
-    await services.auth.clear();
-    await tester.pumpWidget(const SizedBox());
-  });
+      );
+      await tester.pumpAndSettle();
+      final button = tester.widget<FilledButton>(
+        find.widgetWithText(FilledButton, 'Aprobar y emitir orden'),
+      );
+      expect(button.onPressed, null);
+      expect(
+        api.calls.any(
+          (c) => c.method == 'POST' && c.path.endsWith('/purchase-orders'),
+        ),
+        false,
+      );
+      await services.auth.clear();
+      await tester.pumpWidget(const SizedBox());
+    },
+  );
+  // US09 E3: Login displays server errors then opens production workspace without tokens.
   testWidgets(
-    'Login displays server errors then opens production workspace without tokens',
+    'US09 E3 — Login displays server errors then opens production workspace without tokens',
     (tester) async {
       final api = TestApi();
       final services = testServices(api);
@@ -218,31 +228,34 @@ void main() {
       await tester.pumpWidget(const SizedBox());
     },
   );
-  testWidgets('Manager and analyst destinations use actual server roles', (
-    tester,
-  ) async {
-    for (final role in ['PurchaseAnalyst', 'PurchaseManager']) {
-      final api = TestApi(role: role);
-      final services = testServices(api);
-      addTearDown(services.auth.dispose);
-      await services.auth.login('demo@smartquote.local', 'TestOnly!12345');
-      await tester.pumpWidget(SmartQuoteApp(services: services));
-      await tester.pumpAndSettle();
-      expect(find.text('Nueva solicitud'), findsNothing);
-      await tester.tap(find.byTooltip('Open navigation menu'));
-      await tester.pumpAndSettle();
-      expect(find.text('Proveedores'), findsOneWidget);
-      expect(find.text('Notificaciones'), findsNothing);
-      expect(
-        find.text('Cuentas'),
-        role == 'PurchaseManager' ? findsOneWidget : findsNothing,
-      );
-      await services.auth.clear();
-      await tester.pumpWidget(const SizedBox());
-    }
-  });
+  // TS02 E3: Manager and analyst destinations use actual server roles.
   testWidgets(
-    'Request form sends real operators, decimal quantity and optional requirement',
+    'TS02 E3 — Manager and analyst destinations use actual server roles',
+    (tester) async {
+      for (final role in ['PurchaseAnalyst', 'PurchaseManager']) {
+        final api = TestApi(role: role);
+        final services = testServices(api);
+        addTearDown(services.auth.dispose);
+        await services.auth.login('demo@smartquote.local', 'TestOnly!12345');
+        await tester.pumpWidget(SmartQuoteApp(services: services));
+        await tester.pumpAndSettle();
+        expect(find.text('Nueva solicitud'), findsNothing);
+        await tester.tap(find.byTooltip('Open navigation menu'));
+        await tester.pumpAndSettle();
+        expect(find.text('Proveedores'), findsOneWidget);
+        expect(find.text('Notificaciones'), findsNothing);
+        expect(
+          find.text('Cuentas'),
+          role == 'PurchaseManager' ? findsOneWidget : findsNothing,
+        );
+        await services.auth.clear();
+        await tester.pumpWidget(const SizedBox());
+      }
+    },
+  );
+  // US02 E1 E2: Request form sends real operators, decimal quantity and optional requirement.
+  testWidgets(
+    'US02 E1 E2 — Request form sends real operators, decimal quantity and optional requirement',
     (tester) async {
       final api = TestApi();
       final services = testServices(api);
@@ -294,60 +307,66 @@ void main() {
       await tester.pumpWidget(const SizedBox());
     },
   );
-  testWidgets('Criteria use sliders; mandatory filters are retained', (
-    tester,
-  ) async {
-    final api = TestApi(role: 'PurchaseAnalyst');
-    final services = testServices(api);
-    addTearDown(services.auth.dispose);
-    await services.auth.login('demo@smartquote.local', 'TestOnly!12345');
-    await tester.pumpWidget(
-      MaterialApp(
-        home: Scaffold(
-          body: SimulationPanel(
-            services: services,
-            request: PurchaseRequest(requestFixture(status: 'Evaluation')),
-            active: true,
-            onChanged: () async {},
-            onBusy: (_) {},
+  // US06 E1 E2: Criteria use sliders; mandatory filters are retained.
+  testWidgets(
+    'US06 E1 E2 — Criteria use sliders; mandatory filters are retained',
+    (tester) async {
+      final api = TestApi(role: 'PurchaseAnalyst');
+      final services = testServices(api);
+      addTearDown(services.auth.dispose);
+      await services.auth.login('demo@smartquote.local', 'TestOnly!12345');
+      await tester.pumpWidget(
+        MaterialApp(
+          home: Scaffold(
+            body: SimulationPanel(
+              services: services,
+              request: PurchaseRequest(requestFixture(status: 'Evaluation')),
+              active: true,
+              onChanged: () async {},
+              onBusy: (_) {},
+            ),
           ),
         ),
-      ),
-    );
-    await tester.pumpAndSettle();
-    expect(find.byType(Slider), findsNWidgets(2));
-    expect(find.textContaining('Proteína mínima'), findsOneWidget);
-    await tester.scrollUntilVisible(
-      find.text('Agregar ponderación técnica'),
-      250,
-      scrollable: find.byType(Scrollable).first,
-    );
-    await tester.tap(find.text('Agregar ponderación técnica'));
-    await tester.pumpAndSettle();
-    await tester.tap(find.text('Agregar'));
-    await tester.pumpAndSettle();
-    // Lazy list children are built as they become visible.
-    await tester.scrollUntilVisible(
-      find.text('Total ponderado: 100 %'),
-      150,
-      scrollable: find.byType(Scrollable).first,
-    );
-    await tester.pumpAndSettle();
-    expect(find.text('Total ponderado: 100 %'), findsOneWidget);
-    await tester.scrollUntilVisible(
-      find.text('Guardar criterios / nueva versión'),
-      150,
-      scrollable: find.byType(Scrollable).first,
-    );
-    await tester.tap(find.text('Guardar criterios / nueva versión'));
-    await tester.pumpAndSettle();
-    expect(api.savedCriteria.where((c) => c['mode'] == 'Mandatory').length, 1);
-    expect(api.savedCriteria.where((c) => c['mode'] == 'Weighted').length, 3);
-    await services.auth.clear();
-    await tester.pumpWidget(const SizedBox());
-  });
+      );
+      await tester.pumpAndSettle();
+      expect(find.byType(Slider), findsNWidgets(2));
+      expect(find.textContaining('Proteína mínima'), findsOneWidget);
+      await tester.scrollUntilVisible(
+        find.text('Agregar ponderación técnica'),
+        250,
+        scrollable: find.byType(Scrollable).first,
+      );
+      await tester.tap(find.text('Agregar ponderación técnica'));
+      await tester.pumpAndSettle();
+      await tester.tap(find.text('Agregar'));
+      await tester.pumpAndSettle();
+      // Lazy list children are built as they become visible.
+      await tester.scrollUntilVisible(
+        find.text('Total ponderado: 100 %'),
+        150,
+        scrollable: find.byType(Scrollable).first,
+      );
+      await tester.pumpAndSettle();
+      expect(find.text('Total ponderado: 100 %'), findsOneWidget);
+      await tester.scrollUntilVisible(
+        find.text('Guardar criterios / nueva versión'),
+        150,
+        scrollable: find.byType(Scrollable).first,
+      );
+      await tester.tap(find.text('Guardar criterios / nueva versión'));
+      await tester.pumpAndSettle();
+      expect(
+        api.savedCriteria.where((c) => c['mode'] == 'Mandatory').length,
+        1,
+      );
+      expect(api.savedCriteria.where((c) => c['mode'] == 'Weighted').length, 3);
+      await services.auth.clear();
+      await tester.pumpWidget(const SizedBox());
+    },
+  );
+  // US05 E1 E3: Quotation confirmation is blocked until mappings are explicitly reviewed.
   testWidgets(
-    'Quotation confirmation is blocked until mappings are explicitly reviewed',
+    'US05 E1 E3 — Quotation confirmation is blocked until mappings are explicitly reviewed',
     (tester) async {
       final api = TestApi(role: 'PurchaseAnalyst');
       final services = testServices(api);

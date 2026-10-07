@@ -65,7 +65,8 @@ class QueueRepository implements QuotationRepository {
 }
 
 void main() {
-  test('Existing quotations are marked as duplicates without adding fabricated IDs', () async {
+  // US04 E3: Existing quotations are marked as duplicates without adding fabricated IDs.
+  test('US04 E3 — Existing quotations are marked as duplicates without adding fabricated IDs', () async {
     final repository = QueueRepository();
     final queue = UploadQueue(repository, requestId);
     addTearDown(queue.dispose);
@@ -77,32 +78,31 @@ void main() {
     expect(queue.entries.single.duplicate, true);
     expect(queue.entries.single.quotationId, 'cotizacion.pdf');
   });
+  // US10 E1 E2: Queue limits concurrency to two and isolates invalid documents.
+  test('US10 E1 E2 — Queue limits concurrency to two and isolates invalid documents', () async {
+    final repository = QueueRepository();
+    final queue = UploadQueue(repository, requestId);
+    addTearDown(queue.dispose);
+    await queue.start([
+      fileFixture('one.pdf'),
+      fileFixture('damaged.pdf'),
+      fileFixture('three.pdf'),
+      UploadFile(
+        'oversize.pdf',
+        Uint8List(0),
+        'application/pdf',
+        validationError: 'Más de 15 MB',
+      ),
+    ], {});
+    expect(repository.maximumActive, lessThanOrEqualTo(2));
+    expect(queue.entries.where((e) => e.error == null).length, 2);
+    expect(queue.entries.where((e) => e.error != null).length, 2);
+    expect(repository.uploads, 3);
+    expect(queue.running, false);
+  });
+  // US10 E3: Retry an existing document does not upload or process it again.
   test(
-    'Queue limits concurrency to two and isolates invalid documents',
-    () async {
-      final repository = QueueRepository();
-      final queue = UploadQueue(repository, requestId);
-      addTearDown(queue.dispose);
-      await queue.start([
-        fileFixture('one.pdf'),
-        fileFixture('damaged.pdf'),
-        fileFixture('three.pdf'),
-        UploadFile(
-          'oversize.pdf',
-          Uint8List(0),
-          'application/pdf',
-          validationError: 'Más de 15 MB',
-        ),
-      ], {});
-      expect(repository.maximumActive, lessThanOrEqualTo(2));
-      expect(queue.entries.where((e) => e.error == null).length, 2);
-      expect(queue.entries.where((e) => e.error != null).length, 2);
-      expect(repository.uploads, 3);
-      expect(queue.running, false);
-    },
-  );
-  test(
-    'Retry an existing document does not upload or process it again',
+    'US10 E3 — Retry an existing document does not upload or process it again',
     () async {
       final repository = QueueRepository();
       final queue = UploadQueue(repository, requestId);
