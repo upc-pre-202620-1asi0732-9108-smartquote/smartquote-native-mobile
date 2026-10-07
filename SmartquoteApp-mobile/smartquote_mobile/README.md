@@ -1,17 +1,75 @@
-# smartquote_mobile
+# SmartQuote Mobile
 
-A new Flutter project.
+Cliente Flutter del flujo de compras avícolas: solicitudes, cotizaciones con IA, criterios/simulación, órdenes, PDF, entregas, proveedores y métricas. Acceso real mediante IAM del backend, con permisos de producción, analista y jefe.
 
-## Getting Started
+## Ejecutar con Azure
 
-This project is a starting point for a Flutter application.
+Abrir una terminal PowerShell en esta carpeta (donde está `pubspec.yaml`):
 
-A few resources to get you started if this is your first Flutter project:
+```powershell
+flutter pub get
+flutter run -d chrome --web-port 5173 --dart-define=API_BASE_URL=https://smartquote-api-h8czffe5b4dtg6d7.chilecentral-01.azurewebsites.net
+```
 
-- [Learn Flutter](https://docs.flutter.dev/get-started/learn-flutter)
-- [Write your first Flutter app](https://docs.flutter.dev/get-started/codelab)
-- [Flutter learning resources](https://docs.flutter.dev/reference/learning-resources)
+Iniciar sesión con una cuenta existente del backend. No se pegan tokens. Las cuentas nuevas requieren aprobación del jefe, salvo la configuración inicial.
 
-For help getting started with Flutter development, view the
-[online documentation](https://docs.flutter.dev/), which offers tutorials,
-samples, guidance on mobile development, and a full API reference.
+**Puerto:** Azure permite actualmente `http://localhost:5173`, no `5174` (preflight comprobado). Si 5173 está ocupado por la web, detener esa ejecución o pedir al administrador que agregue `http://localhost:5174` como un valor adicional de `Cors__AllowedOrigins__N` y reinicie el backend; después usar `--web-port 5174`. No reemplazar los orígenes anteriores. Android nativo no necesita CORS de navegador.
+
+Si `flutter` no se reconoce, agregar `E:\Documentos\flutter\bin` al PATH o sustituir `flutter` por `& 'E:\Documentos\flutter\bin\flutter.bat'` en los comandos.
+
+## Android
+
+Con emulador o dispositivo conectado:
+
+```powershell
+flutter devices
+flutter run -d ID_DEL_DISPOSITIVO --dart-define=API_BASE_URL=https://smartquote-api-h8czffe5b4dtg6d7.chilecentral-01.azurewebsites.net
+```
+
+Sustituir `ID_DEL_DISPOSITIVO` por el identificador de `flutter devices`. Para generar una APK de prueba:
+
+```powershell
+$env:GRADLE_USER_HOME = Join-Path (Get-Location) 'build\gradle-verification'
+flutter build apk --debug --dart-define=API_BASE_URL=https://smartquote-api-h8czffe5b4dtg6d7.chilecentral-01.azurewebsites.net
+```
+
+Salida: `build/app/outputs/flutter-apk/app-debug.apk`. La caché Gradle separada evita la caché global dañada encontrada en este equipo; `kotlin.incremental=false` evita conflictos entre el proyecto en E: y paquetes en C:. No cambia permisos ni lógica de negocio. Para distribución definitiva faltan firma e identificador propios.
+
+## Backend local / contingencia
+
+Desde otra terminal, con la configuración privada del backend ya preparada:
+
+```powershell
+Set-Location E:\smartquote-web-services
+docker compose up -d --build api
+```
+
+No eliminar volúmenes de PostgreSQL. La recompilación importa: el contenedor local existente devolvió un 403 al analista en la consulta de órdenes, distinto del código actual y Azure.
+
+En esta carpeta Flutter:
+
+```powershell
+flutter run -d chrome --web-port 5173 --dart-define=API_BASE_URL=http://localhost:8080
+```
+
+En Android emulado usar `http://10.0.2.2:8080`; en un teléfono físico, la IP LAN del equipo y acceso de red al puerto 8080. HTTP está habilitado únicamente para depuración; builds de distribución requieren HTTPS. La IA real requiere internet y OpenAI configurado en el backend. `AI__Provider=Stub` es una extracción de prueba explícita, no evidencia de lectura real del PDF.
+
+## Pruebas y guía del flujo
+
+```powershell
+flutter analyze
+./tool/run-tests.ps1
+./tool/run-tests.ps1 -Story US07
+./tool/run-tests.ps1 -Level Integration
+flutter build web --release --dart-define=API_BASE_URL=https://smartquote-api-h8czffe5b4dtg6d7.chilecentral-01.azurewebsites.net
+```
+
+`-Level Integration` necesita Docker Desktop y el backend en `E:\smartquote-web-services`: levanta una API/base temporales y ejecuta el flujo HTTP completo, con login real y PDF. No modifica Azure ni la base de demostración. La extracción usa Stub; SUNAT se comprueba mediante contratos controlados y las pruebas del backend.
+
+Para ejecutar el mismo flujo de repositorios/PDF en Android conectado: `./tool/run-tests.ps1 -Level Android -Device ID_DE_FLUTTER_DEVICES` (`adb` en PATH). Usa y elimina un túnel `adb reverse`. Es distinto a los tests de widgets y a una prueba en Chrome. Los valores `SMARTQUOTE_TEST_*` son exclusivamente configuración efímera de esta prueba, nunca credenciales de producción.
+
+En GitHub, publicar primero el backend con `tests/run-tests.ps1` y configurar **Settings → Secrets and variables → Actions → Variables**: `SMARTQUOTE_BACKEND_TEST_REF` con el SHA completo (40 caracteres) de esa revisión. CI incluye integración HTTP obligatoria; Android conectado se ejecuta por separado.
+
+SUNAT ya se utiliza dentro de la simulación del backend. Flutter muestra la tasa/procedencia recibida; no consulta SUNAT directamente ni incluye sus credenciales.
+
+No almacenar contraseñas, claves OpenAI/SUNAT o claves JWT en `--dart-define`. `API_BASE_URL` y, opcionalmente, `LANDING_PAGE_URL`, `PURCHASER_NAME`, `PURCHASER_RUC`, `PURCHASER_ADDRESS` son configuración pública. Los datos corporativos también se pueden introducir al exportar; no se completan con datos ficticios.

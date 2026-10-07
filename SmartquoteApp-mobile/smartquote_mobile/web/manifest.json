@@ -1,11 +1,11 @@
 {
-    "name": "smartquote_mobile",
-    "short_name": "smartquote_mobile",
+    "name": "SmartQuote",
+    "short_name": "SmartQuote",
     "start_url": ".",
     "display": "standalone",
-    "background_color": "#0175C2",
-    "theme_color": "#0175C2",
-    "description": "A new Flutter project.",
+    "background_color": "#F5F7FA",
+    "theme_color": "#0F5B8C",
+    "description": "Gestión y evaluación de compras avícolas.",
     "orientation": "portrait-primary",
     "prefer_related_applications": false,
     "icons": [
