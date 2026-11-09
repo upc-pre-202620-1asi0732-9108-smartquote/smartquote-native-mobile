@@ -1,4 +1,6 @@
 import '../identity_access/application/session_controller.dart';
+import '../supply_requests/domain/request_workflows.dart';
+import '../quotation_intake/domain/expiry_alerts.dart';
 import '../supply_requests/domain/purchase_request.dart';
 import '../quotation_intake/domain/quotation.dart';
 import '../evaluation_simulation/domain/evaluation.dart';
@@ -14,8 +16,12 @@ class Services {
     required this.evaluations,
     required this.orders,
     required this.orderExporter,
+    this.workflows,
+    this.expiryAlerts,
   });
   final SessionController auth;
+  final RequestWorkflowRepository? workflows;
+  final ExpiryAlertRepository? expiryAlerts;
   final RequestRepository requests;
   final QuotationRepository quotations;
   final EvaluationRepository evaluations;

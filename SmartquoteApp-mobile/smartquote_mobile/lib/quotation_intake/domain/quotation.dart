@@ -9,6 +9,9 @@ class Quotation {
   List<JsonObject> get fields => objectsOf(data['fields']);
   List<JsonObject> get lines => objectsOf(data['lines']);
   bool get verified => status == 'Verified';
+  bool get expired =>
+      data['commercialStatus'] == 'Expired' ||
+      (verified && data['isCurrent'] == false);
   bool get canConfirm =>
       status == 'RequiresVerification' &&
       lines.isNotEmpty &&

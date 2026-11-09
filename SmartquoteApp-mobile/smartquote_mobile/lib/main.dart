@@ -1,6 +1,8 @@
 import 'package:flutter/material.dart';
 
 import 'app/services.dart';
+import 'supply_requests/infrastructure/http_request_workflow_repository.dart';
+import 'quotation_intake/infrastructure/http_expiry_alert_repository.dart';
 import 'app/workspace.dart';
 import 'identity_access/application/session_controller.dart';
 import 'identity_access/infrastructure/http_identity_repository.dart';
@@ -25,6 +27,8 @@ void main() {
     SmartQuoteApp(
       services: Services(
         auth: auth,
+        workflows: HttpRequestWorkflowRepository(api),
+        expiryAlerts: HttpExpiryAlertRepository(api),
         requests: HttpRequestRepository(api),
         quotations: HttpQuotationRepository(api),
         evaluations: HttpEvaluationRepository(api),

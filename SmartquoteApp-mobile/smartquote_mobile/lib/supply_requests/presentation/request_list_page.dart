@@ -78,6 +78,7 @@ class _RequestListPageState extends OperationState<RequestListPage> {
           items:
               [
                     '',
+                    if (widget.services.auth.session!.production) 'Draft',
                     'Submitted',
                     'UnderReview',
                     'QuotationCollection',

@@ -1,6 +1,8 @@
 import 'package:flutter/material.dart';
 
 import 'services.dart';
+import '../supply_requests/presentation/clarifications_panel.dart';
+import '../supply_requests/presentation/new_request_page.dart';
 import '../shared/domain/api_contract.dart';
 import '../shared/infrastructure/file_selection.dart';
 import '../shared/presentation/operation_state.dart';
@@ -27,6 +29,7 @@ class _RequestWorkspaceState extends OperationState<RequestWorkspace> {
   PurchaseRequest? request;
   List<JsonObject> history = [], audit = [];
   int tab = 0;
+  int clarificationRefresh = 0;
   bool working = false;
   bool pendingCriteria = false;
   @override
@@ -111,12 +114,54 @@ class _RequestWorkspaceState extends OperationState<RequestWorkspace> {
     await reloadPreservingError();
   }
 
+  Future<void> ask(JsonObject item, JsonObject requirement) async {
+    final values = await dataDialog(
+      context,
+      'Aclarar ${textOf(requirement, 'name')}',
+      [('question', 'Consulta al especialista solicitante', '')],
+    );
+    if (values == null) return;
+    final ok = await perform(() async {
+      await widget.services.workflows!.ask(widget.requestId, {
+        'itemId': textOf(item, 'itemId'),
+        'requirementId': textOf(requirement, 'requirementId'),
+        'specialistId': textOf(request!.data, 'requesterId'),
+        'question': values['question'],
+        'expectedVersion': request!.version,
+      });
+      return true;
+    });
+    if (ok == true && mounted) {
+      setState(() => clarificationRefresh++);
+      notice('Consulta enviada al especialista que creó la solicitud.');
+      await load();
+    }
+  }
+
+  Future<void> submitDraft() async {
+    if (!await confirmAction(
+      context,
+      'Enviar solicitud revisada',
+      'Confirma que los ítems, requisitos y fecha requerida son correctos. El borrador se enviará a adquisiciones.',
+    )) {
+      return;
+    }
+    await perform(
+      () => widget.services.workflows!.submitDraft(
+        widget.requestId,
+        request!.version,
+      ),
+    );
+    await reloadPreservingError();
+  }
+
   @override
   Widget build(BuildContext context) {
     final session = widget.services.auth.session!;
     final labels = [
       'Solicitud',
       if (session.purchasing) ...['Cotizaciones', 'Simulación', 'Orden'],
+      if (widget.services.workflows != null) 'Aclaraciones',
     ];
     return PopScope(
       canPop: !working && !busy,
@@ -191,6 +236,15 @@ class _RequestWorkspaceState extends OperationState<RequestWorkspace> {
                         pendingCriteria: pendingCriteria,
                       ),
                     ],
+                    if (widget.services.workflows != null)
+                      ClarificationsPanel(
+                        key: ValueKey(
+                          'clarifications-${request!.version}-$clarificationRefresh',
+                        ),
+                        services: widget.services,
+                        requestId: widget.requestId,
+                        onChanged: load,
+                      ),
                   ],
                 ),
               ),
@@ -212,6 +266,34 @@ class _RequestWorkspaceState extends OperationState<RequestWorkspace> {
             title: 'Solicitud',
             children: [
               StatusChip(request!.status),
+              if (request!.status == 'Draft' &&
+                  production &&
+                  widget.services.workflows != null) ...[
+                const Text(
+                  'Borrador recurrente: privado y pendiente de revisión. Guardar cambios no lo envía a adquisiciones.',
+                ),
+                OutlinedButton(
+                  onPressed: busy
+                      ? null
+                      : () async {
+                          await Navigator.push(
+                            context,
+                            MaterialPageRoute<String>(
+                              builder: (_) => NewRequestPage(
+                                services: widget.services,
+                                existing: request,
+                              ),
+                            ),
+                          );
+                          if (mounted) await load();
+                        },
+                  child: const Text('Editar borrador'),
+                ),
+                FilledButton(
+                  onPressed: busy ? null : submitDraft,
+                  child: const Text('Confirmar y enviar solicitud'),
+                ),
+              ],
               Text(
                 'Fecha requerida: ${dateLabel(textOf(data, 'requiredDate'))}',
               ),
@@ -253,8 +335,28 @@ class _RequestWorkspaceState extends OperationState<RequestWorkspace> {
                 for (final r in objectsOf(item['requirements']))
                   Padding(
                     padding: const EdgeInsets.symmetric(vertical: 4),
-                    child: Text(
-                      '${textOf(r, 'name')}: ${operatorLabels[textOf(r, 'operator')] ?? textOf(r, 'operator')} ${textOf(r, 'expectedValue')} ${textOf(r, 'unitOfMeasure')} · ${r['isMandatory'] == true ? 'obligatorio' : 'opcional'}',
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          '${textOf(r, 'name')}: ${operatorLabels[textOf(r, 'operator')] ?? textOf(r, 'operator')} ${textOf(r, 'expectedValue')} ${textOf(r, 'unitOfMeasure')} · ${r['isMandatory'] == true ? 'obligatorio' : 'opcional'}',
+                        ),
+                        if (widget.services.workflows != null &&
+                            widget.services.auth.session!.has(
+                              'PurchaseAnalyst',
+                            ) &&
+                            ![
+                              'Draft',
+                              'Ordered',
+                              'Rejected',
+                              'Cancelled',
+                            ].contains(request!.status))
+                          TextButton.icon(
+                            onPressed: busy ? null : () => ask(item, r),
+                            icon: const Icon(Icons.help_outline),
+                            label: const Text('Solicitar aclaración'),
+                          ),
+                      ],
                     ),
                   ),
               ],

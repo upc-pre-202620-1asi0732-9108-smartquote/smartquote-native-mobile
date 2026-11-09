@@ -169,6 +169,12 @@ class _QuotationReviewPageState extends OperationState<QuotationReviewPage> {
               title: textOf(quote!.data, 'fileName'),
               children: [
                 StatusChip(quote!.status),
+                if (quote!.data['commercialStatus'] == 'Expired' ||
+                    (quote!.verified && quote!.data['isCurrent'] == false))
+                  const Text(
+                    'Esta oferta no está vigente para nuevas compras. Su lectura no amplía las condiciones; solicita una cotización vigente y vuelve a evaluar.',
+                    style: TextStyle(color: Color(0xffc5221f)),
+                  ),
                 Text(
                   'Proveedor: ${textOf(quote!.data, 'supplierBusinessName')}',
                 ),

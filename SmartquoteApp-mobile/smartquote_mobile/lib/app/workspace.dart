@@ -1,6 +1,9 @@
 import 'package:flutter/material.dart';
 
 import 'services.dart';
+import '../supply_requests/presentation/clarifications_panel.dart';
+import '../supply_requests/presentation/recurring_requests_page.dart';
+import '../quotation_intake/presentation/expiry_alerts_page.dart';
 import '../identity_access/domain/session.dart';
 import '../identity_access/presentation/pending_page.dart';
 import '../supply_requests/presentation/request_list_page.dart';
@@ -30,6 +33,25 @@ class _WorkspaceState extends State<Workspace> {
           'Notificaciones',
           Icons.notifications_outlined,
           NotificationsPage(services: widget.services),
+        ),
+      if (session.production && widget.services.workflows != null) ...[
+        (
+          'Aclaraciones',
+          Icons.question_answer_outlined,
+          ClarificationsPanel(services: widget.services),
+        ),
+        (
+          'Programaciones',
+          Icons.event_repeat,
+          RecurringRequestsPage(services: widget.services),
+        ),
+      ],
+      if (session.has('PurchaseAnalyst') &&
+          widget.services.expiryAlerts != null)
+        (
+          'Vencimientos',
+          Icons.notification_important_outlined,
+          ExpiryAlertsPage(services: widget.services),
         ),
       if (session.purchasing)
         (

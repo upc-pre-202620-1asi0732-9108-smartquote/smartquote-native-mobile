@@ -4,6 +4,11 @@ import 'package:intl/intl.dart';
 import '../domain/api_contract.dart';
 
 const statusLabels = {
+  'Draft': 'Borrador por revisar',
+  'Answered': 'Respondida',
+  'Applied': 'Especificación revisada',
+  'RevisionApplied': 'Especificación revisada',
+  'Expired': 'Vencida · no vigente',
   'Submitted': 'Enviada',
   'UnderReview': 'En revisión',
   'QuotationCollection': 'Recepción de cotizaciones',

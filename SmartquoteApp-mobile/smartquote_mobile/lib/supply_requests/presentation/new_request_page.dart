@@ -5,22 +5,72 @@ import '../../shared/domain/api_contract.dart';
 import '../../shared/presentation/operation_state.dart';
 import '../../shared/presentation/ui.dart';
 import '../application/request_draft.dart';
+import '../domain/purchase_request.dart';
 
 class NewRequestPage extends StatefulWidget {
-  const NewRequestPage({super.key, required this.services});
+  const NewRequestPage({
+    super.key,
+    required this.services,
+    this.existing,
+    this.recurring = false,
+  });
   final Services services;
+  final PurchaseRequest? existing;
+  final bool recurring;
   @override
   State<NewRequestPage> createState() => _NewRequestPageState();
 }
 
 class _NewRequestPageState extends OperationState<NewRequestPage> {
   final _form = GlobalKey<FormState>();
-  final draft = RequestDraft();
+  late final draft = widget.existing == null
+      ? RequestDraft()
+      : RequestDraft.fromJson(widget.existing!.data);
+  int intervalDays = 7, offsetDays = 2;
+  String zone = 'America/Lima';
   Future<void> submit() async {
+    if (widget.recurring &&
+        (intervalDays < 1 ||
+            intervalDays > 3650 ||
+            offsetDays < 0 ||
+            offsetDays > 3650)) {
+      setState(
+        () => error = const ApiFailure(
+          'La periodicidad debe ser de 1 a 3650 días y la anticipación de 0 a 3650 días.',
+        ),
+      );
+      notice('Revisa la periodicidad y la anticipación de la programación.');
+      return;
+    }
     if (!_form.currentState!.validate()) return;
     final invalid = draft.validate();
     if (invalid != null) {
       setState(() => error = ApiFailure(invalid));
+      return;
+    }
+    if (widget.recurring || widget.existing != null) {
+      final saved = await perform(() async {
+        if (widget.recurring) {
+          final body = draft.toJson()..remove('requiredDate');
+          await widget.services.workflows!.createSchedule({
+            ...body,
+            'startDate': draft.requiredDate.toIso8601String().substring(0, 10),
+            'intervalDays': intervalDays,
+            'requiredDateOffsetDays': offsetDays,
+            'timeZoneId': zone,
+          });
+        } else {
+          // Use the version of the form being edited, not a newer version silently fetched on save.
+          await widget.services.workflows!.saveDraft(widget.existing!.id, {
+            ...draft.toJson(),
+            'expectedVersion': widget.existing!.version,
+          });
+        }
+        return true;
+      });
+      if (saved == true && mounted) {
+        Navigator.pop(context, widget.existing?.id ?? 'schedule');
+      }
       return;
     }
     final created = await perform(
@@ -57,7 +107,15 @@ class _NewRequestPageState extends OperationState<NewRequestPage> {
   Widget build(BuildContext context) => PopScope(
     canPop: !busy,
     child: Scaffold(
-      appBar: AppBar(title: const Text('Nueva solicitud')),
+      appBar: AppBar(
+        title: Text(
+          widget.recurring
+              ? 'Programar solicitudes'
+              : widget.existing != null
+              ? 'Editar borrador'
+              : 'Nueva solicitud',
+        ),
+      ),
       body: Form(
         key: _form,
         child: AbsorbPointer(
@@ -75,7 +133,11 @@ class _NewRequestPageState extends OperationState<NewRequestPage> {
                 children: [
                   ListTile(
                     contentPadding: EdgeInsets.zero,
-                    title: const Text('Fecha requerida'),
+                    title: Text(
+                      widget.recurring
+                          ? 'Primera fecha de generación'
+                          : 'Fecha requerida',
+                    ),
                     subtitle: Text(
                       dateLabel(draft.requiredDate.toIso8601String()),
                     ),
@@ -84,7 +146,9 @@ class _NewRequestPageState extends OperationState<NewRequestPage> {
                       final now = DateUtils.dateOnly(DateTime.now());
                       final value = await showDatePicker(
                         context: context,
-                        initialDate: draft.requiredDate,
+                        initialDate: draft.requiredDate.isBefore(now)
+                            ? now
+                            : draft.requiredDate,
                         firstDate: now,
                         lastDate: now.add(const Duration(days: 730)),
                       );
@@ -108,6 +172,44 @@ class _NewRequestPageState extends OperationState<NewRequestPage> {
                   ),
                 ],
               ),
+              if (widget.recurring)
+                InfoCard(
+                  title: 'Periodicidad',
+                  children: [
+                    const Text(
+                      'Cada ocurrencia genera un borrador privado. Debes revisarlo y confirmar su envío; nunca se emiten órdenes automáticamente.',
+                    ),
+                    TextFormField(
+                      initialValue: '7',
+                      decoration: fieldDecoration('Generar cada (días)'),
+                      keyboardType: TextInputType.number,
+                      validator: (v) =>
+                          (int.tryParse(v ?? '') ?? 0) >= 1 &&
+                              (int.tryParse(v ?? '') ?? 3651) <= 3650
+                          ? null
+                          : 'Ingresa entre 1 y 3650 días.',
+                      onChanged: (v) => intervalDays = int.tryParse(v) ?? 0,
+                    ),
+                    const SizedBox(height: 12),
+                    TextFormField(
+                      initialValue: '2',
+                      decoration: fieldDecoration(
+                        'Días desde generación hasta fecha requerida',
+                      ),
+                      keyboardType: TextInputType.number,
+                      validator: (v) =>
+                          (int.tryParse(v ?? '') ?? -1) >= 0 &&
+                              (int.tryParse(v ?? '') ?? 3651) <= 3650
+                          ? null
+                          : 'Ingresa entre 0 y 3650 días.',
+                      onChanged: (v) => offsetDays = int.tryParse(v) ?? -1,
+                    ),
+                    const SizedBox(height: 12),
+                    const Text(
+                      'Zona horaria de operación: America/Lima (Perú).',
+                    ),
+                  ],
+                ),
               for (var i = 0; i < draft.items.length; i++)
                 itemCard(draft.items[i], i),
               OutlinedButton.icon(
@@ -118,7 +220,15 @@ class _NewRequestPageState extends OperationState<NewRequestPage> {
               const SizedBox(height: 16),
               FilledButton(
                 onPressed: submit,
-                child: Text(busy ? 'Registrando…' : 'Registrar solicitud'),
+                child: Text(
+                  busy
+                      ? 'Guardando…'
+                      : widget.recurring
+                      ? 'Guardar programación'
+                      : widget.existing != null
+                      ? 'Guardar borrador sin enviar'
+                      : 'Registrar solicitud',
+                ),
               ),
               const SizedBox(height: 16),
               const Text(
