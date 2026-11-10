@@ -54,6 +54,16 @@ class HttpEvaluationRepository implements EvaluationRepository {
     ),
   );
   @override
+  Future<Simulation> simulateDistributed(String scenarioId) async => Simulation(
+    objectOf(
+      await api.request(
+        '/evaluation-scenarios/$scenarioId/distributed-simulations',
+        method: 'POST',
+        timeout: const Duration(minutes: 3),
+      ),
+    ),
+  );
+  @override
   Future<Simulation> getSimulation(String id) async =>
       Simulation(objectOf(await api.request('/simulations/$id')));
   @override

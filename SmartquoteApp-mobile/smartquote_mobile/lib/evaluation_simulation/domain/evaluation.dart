@@ -12,6 +12,8 @@ class Simulation {
   final JsonObject data;
   String get id => textOf(data, 'simulationRunId');
   bool get current => data['isCurrent'] == true;
+  bool get distributed => data['mode'] == 'DistributedByItem';
+  JsonObject get distribution => objectOf(data['distribution'] ?? {});
   List<JsonObject> get evaluations => objectsOf(data['evaluations']);
   JsonObject? get recommendation =>
       data['recommendation'] == null ? null : objectOf(data['recommendation']);
@@ -28,6 +30,7 @@ abstract interface class EvaluationRepository {
     EvaluationScenario? current,
   );
   Future<Simulation> simulate(String scenarioId);
+  Future<Simulation> simulateDistributed(String scenarioId);
   Future<Simulation> getSimulation(String id);
   Future<List<Simulation>> history(String requestId);
 }

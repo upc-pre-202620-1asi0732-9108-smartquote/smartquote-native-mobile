@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 
 import 'services.dart';
+import '../supply_requests/presentation/assignment_dialog.dart';
 import '../supply_requests/presentation/clarifications_panel.dart';
 import '../supply_requests/presentation/new_request_page.dart';
 import '../shared/domain/api_contract.dart';
@@ -11,6 +12,7 @@ import '../shared/presentation/form_dialog.dart';
 import '../supply_requests/domain/purchase_request.dart';
 import '../quotation_intake/presentation/quotations_panel.dart';
 import '../evaluation_simulation/presentation/simulation_panel.dart';
+import '../evaluation_simulation/presentation/distributed_purchase_panel.dart';
 import '../purchase_ordering/presentation/order_panel.dart';
 
 class RequestWorkspace extends StatefulWidget {
@@ -155,12 +157,90 @@ class _RequestWorkspaceState extends OperationState<RequestWorkspace> {
     await reloadPreservingError();
   }
 
+  Future<void> changeAssignment(PurchaseRequest current) async {
+    final selection = await showDialog<(String, String?)>(
+      context: context,
+      builder: (_) => AssignmentDialog(
+        repository: widget.services.requests,
+        request: current,
+      ),
+    );
+    if (selection == null || !mounted) return;
+    final updated = await perform(
+      () => widget.services.requests.assignAnalyst(
+        current,
+        selection.$1,
+        reason: selection.$2,
+      ),
+    );
+    if (!mounted) return;
+    if (updated == null) {
+      await reloadPreservingError();
+      return;
+    }
+    setState(() => request = updated);
+    notice('Analista responsable actualizado.');
+  }
+
+  Future<void> showAssignmentHistory() async {
+    final entries = widget.services.requests.assignmentHistory(
+      widget.requestId,
+    );
+    await showDialog<void>(
+      context: context,
+      builder: (dialogContext) => AlertDialog(
+        title: const Text('Historial de asignaciones'),
+        content: FutureBuilder<List<JsonObject>>(
+          future: entries,
+          builder: (context, snapshot) {
+            if (snapshot.hasError) return ErrorNotice(snapshot.error);
+            final history = snapshot.data;
+            if (history == null) return const LinearProgressIndicator();
+            if (history.isEmpty) {
+              return const Text('Sin asignaciones registradas.');
+            }
+            return SingleChildScrollView(
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  for (final entry in history.reversed)
+                    Padding(
+                      padding: const EdgeInsets.only(bottom: 12),
+                      child: Text(
+                        '${dateLabel(textOf(entry, 'assignedAt'), time: true)}\n'
+                        'Anterior: ${entry['previousAnalystId'] ?? 'Sin asignar'}\n'
+                        'Analista: ${textOf(entry, 'analystId')}\n'
+                        'Registrado por: ${textOf(entry, 'assignedBy')}'
+                        '${entry['reason'] == null ? '' : '\nMotivo: ${textOf(entry, 'reason')}'}',
+                      ),
+                    ),
+                ],
+              ),
+            );
+          },
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(dialogContext),
+            child: const Text('Cerrar'),
+          ),
+        ],
+      ),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     final session = widget.services.auth.session!;
     final labels = [
       'Solicitud',
-      if (session.purchasing) ...['Cotizaciones', 'Simulación', 'Orden'],
+      if (session.purchasing) ...[
+        'Cotizaciones',
+        'Simulación',
+        'Orden',
+        'Compra distribuida',
+      ],
       if (widget.services.workflows != null) 'Aclaraciones',
     ];
     return PopScope(
@@ -235,6 +315,14 @@ class _RequestWorkspaceState extends OperationState<RequestWorkspace> {
                         onBusy: setWorking,
                         pendingCriteria: pendingCriteria,
                       ),
+                      DistributedPurchasePanel(
+                        services: widget.services,
+                        request: request!,
+                        active: tab == 4,
+                        pendingCriteria: pendingCriteria,
+                        onBusy: setWorking,
+                        onChanged: load,
+                      ),
                     ],
                     if (widget.services.workflows != null)
                       ClarificationsPanel(
@@ -256,7 +344,8 @@ class _RequestWorkspaceState extends OperationState<RequestWorkspace> {
   }
 
   Widget detail(bool purchasing, bool production, bool manager) {
-    final data = request!.data;
+    final current = request!;
+    final data = current.data;
     return RefreshIndicator(
       onRefresh: load,
       child: ListView(
@@ -301,6 +390,28 @@ class _RequestWorkspaceState extends OperationState<RequestWorkspace> {
                 'Prioridad: ${priorityLabels[textOf(data, 'priority')] ?? textOf(data, 'priority')}',
               ),
               Text('Área responsable: ${textOf(data, 'nextResponsibleArea')}'),
+              if (purchasing)
+                SelectableText(
+                  current.assignedAnalystId.isEmpty
+                      ? 'Sin analista asignado'
+                      : 'Analista responsable: ${current.assignedAnalystId}',
+                ),
+              if (purchasing)
+                TextButton(
+                  onPressed: busy || working ? null : showAssignmentHistory,
+                  child: const Text('Ver historial de asignaciones'),
+                ),
+              if (manager && current.canBeAssigned)
+                OutlinedButton(
+                  onPressed: busy || working
+                      ? null
+                      : () => changeAssignment(current),
+                  child: Text(
+                    current.assignedAnalystId.isEmpty
+                        ? 'Asignar analista'
+                        : 'Reasignar analista',
+                  ),
+                ),
               SelectableText('Identificador: ${request!.id}'),
               Text(
                 'Creada: ${dateLabel(textOf(data, 'createdAt'), time: true)}',

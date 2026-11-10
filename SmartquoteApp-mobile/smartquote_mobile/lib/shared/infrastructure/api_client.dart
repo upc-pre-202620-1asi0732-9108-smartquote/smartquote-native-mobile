@@ -60,6 +60,7 @@ class ApiClient implements ApiGateway, SessionTransport {
     Object? body,
     JsonObject? query,
     bool authenticated = true,
+    String? idempotencyKey,
     Duration? timeout,
     void Function(int sent, int total)? onSendProgress,
   }) async {
@@ -73,7 +74,10 @@ class ApiClient implements ApiGateway, SessionTransport {
       options: Options(
         method: method,
         receiveTimeout: timeout ?? const Duration(seconds: 45),
-        headers: authenticated ? {'Authorization': 'Bearer $accessToken'} : {},
+        headers: {
+          if (authenticated) 'Authorization': 'Bearer $accessToken',
+          'Idempotency-Key': ?idempotencyKey,
+        },
       ),
       onSendProgress: onSendProgress,
     );
