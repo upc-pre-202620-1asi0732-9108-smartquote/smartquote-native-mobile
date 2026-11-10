@@ -33,6 +33,7 @@ class OrderPanel extends StatefulWidget {
 
 class _OrderPanelState extends OperationState<OrderPanel> {
   PurchaseOrder? order;
+  bool distributedAward = false;
   List<Simulation> runs = [];
   Simulation? run;
   String? choice;
@@ -53,8 +54,19 @@ class _OrderPanelState extends OperationState<OrderPanel> {
   }
 
   Future<void> fetch() async {
-    order = await widget.services.orders.byRequest(widget.request.id);
-    runs = await widget.services.evaluations.history(widget.request.id);
+    try {
+      order = await widget.services.orders.byRequest(widget.request.id);
+      distributedAward = false;
+    } on ApiFailure catch (failure) {
+      if (failure.code != 'multiple_purchase_orders') rethrow;
+      distributedAward = true;
+      order = null;
+      run = null;
+      return;
+    }
+    runs = (await widget.services.evaluations.history(widget.request.id))
+        .where((result) => !result.distributed)
+        .toList();
     final selectedId = run?.id;
     run =
         runs.where((r) => r.id == selectedId).firstOrNull ??
@@ -260,7 +272,9 @@ class _OrderPanelState extends OperationState<OrderPanel> {
           ),
         ],
       ),
-      if (order == null && run == null && !busy)
+      if (distributedAward)
+        const Text('Consulta las órdenes en la pestaña Compra distribuida.')
+      else if (order == null && run == null && !busy)
         const Text(
           'Primero ejecuta una simulación. La orden se recupera desde la solicitud, sin guardar enlaces manualmente.',
         ),

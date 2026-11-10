@@ -21,10 +21,22 @@ class PurchaseOrder {
   List<JsonObject> get lines => objectsOf(data['lines']);
 }
 
+class PurchaseAward {
+  PurchaseAward(JsonObject data)
+    : summary = objectOf(data['award']),
+      orders = objectsOf(data['orders']).map(PurchaseOrder.new).toList();
+  final JsonObject summary;
+  final List<PurchaseOrder> orders;
+  bool get distributed => summary['mode'] == 'DistributedByItem';
+}
+
 abstract interface class OrderRepository {
   Future<PurchaseOrder?> byRequest(String requestId);
   Future<PurchaseOrder?> bySimulation(String runId);
   Future<PurchaseOrder> get(String id);
+  Future<PurchaseAward?> awardByRequest(String requestId);
+  Future<JsonObject> distributedBudget(String runId);
+  Future<PurchaseAward> approveDistributed(String runId, JsonObject decision);
   Future<PurchaseOrder> approve(
     String runId,
     String quoteId,
