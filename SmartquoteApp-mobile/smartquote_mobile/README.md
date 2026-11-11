@@ -76,8 +76,4 @@ SUNAT ya se utiliza dentro de la simulación del backend. Flutter muestra la tas
 
 US15–US17 están conectadas a los contratos del backend. Producción accede a **Aclaraciones** y **Programaciones**; el analista dispone de **Vencimientos** y puede solicitar aclaraciones desde cada requisito de una solicitud activa. Los borradores recurrentes se editan y se envían mediante acciones separadas. Consultar [guía de escenarios, permisos y verificación](docs/us15-us16-us17.md).
 
-## Proveedores, sensibilidad y presupuesto
-
-US18–US20 están conectadas a los contratos del backend. Compras dispone de **Habilitación** para consultar proveedores; el jefe los habilita, suspende o reactiva con un motivo. En cada solicitud, la pestaña **Orden** muestra el presupuesto y su contraste con la oferta elegida, y la pestaña **Sensibilidad** (jefe) analiza cómo cambia la recomendación al variar los pesos comerciales. Consultar [guía de escenarios, permisos y verificación](docs/us18-us19-us20.md).
-
 No almacenar contraseñas, claves OpenAI/SUNAT o claves JWT en `--dart-define`. `API_BASE_URL` y, opcionalmente, `LANDING_PAGE_URL`, `PURCHASER_NAME`, `PURCHASER_RUC`, `PURCHASER_ADDRESS` son configuración pública. Los datos corporativos también se pueden introducir al exportar; no se completan con datos ficticios.
