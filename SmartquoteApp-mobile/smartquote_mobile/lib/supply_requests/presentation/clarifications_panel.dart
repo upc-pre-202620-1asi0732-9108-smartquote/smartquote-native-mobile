@@ -6,6 +6,7 @@ import '../../shared/domain/api_contract.dart';
 import '../../shared/presentation/operation_state.dart';
 import '../../shared/presentation/ui.dart';
 import '../../shared/presentation/form_dialog.dart';
+import '../domain/purchase_request.dart';
 
 /// US15: origin-linked conversation; a response and a specification revision are separate commands.
 class ClarificationsPanel extends StatefulWidget {
@@ -24,6 +25,10 @@ class ClarificationsPanel extends StatefulWidget {
 
 class _ClarificationsPanelState extends OperationState<ClarificationsPanel> {
   List<JsonObject> entries = [], revisions = [];
+  // Requests of the listed clarifications, to show item and requirement names.
+  final requests = <String, PurchaseRequest>{};
+  String get currentUserId =>
+      textOf(widget.services.auth.session!.user, 'userId');
   int page = 1;
   bool get production => widget.services.auth.session!.production;
   @override
@@ -42,6 +47,14 @@ class _ClarificationsPanelState extends OperationState<ClarificationsPanel> {
         revisions = await widget.services.workflows!.revisions(
           widget.requestId!,
         );
+      }
+      for (final id in entries.map((c) => textOf(c, 'requestId')).toSet()) {
+        if (requests.containsKey(id)) continue;
+        try {
+          requests[id] = await widget.services.requests.get(id);
+        } on ApiFailure {
+          // Without access to the request the origin stays generic.
+        }
       }
     });
   }
@@ -236,17 +249,15 @@ class _ClarificationsPanelState extends OperationState<ClarificationsPanel> {
             title: 'SOL-${shortId(textOf(c, 'requestId'))}',
             children: [
               StatusChip(textOf(c, 'status')),
-              SelectableText(
-                'Ítem: ${textOf(c, 'itemId')}\nRequisito: ${textOf(c, 'requirementId')}',
-              ),
+              Text(origin(c)),
               Text('Consulta: ${textOf(c, 'question')}'),
               Text(
-                'Autor: ${textOf(c, 'authorId')} · ${dateLabel(textOf(c, 'createdAt'), time: true)}',
+                'Autor: ${actorLabel(textOf(c, 'authorId'), currentUserId, 'Analista de compras')} · ${dateLabel(textOf(c, 'createdAt'), time: true)}',
               ),
               if (c['answer'] != null) ...[
                 Text('Respuesta: ${textOf(c, 'answer')}'),
                 Text(
-                  'Responsable: ${textOf(c, 'answeredBy')} · ${dateLabel(textOf(c, 'answeredAt'), time: true)}',
+                  'Responde: ${actorLabel(textOf(c, 'answeredBy'), currentUserId, 'Especialista solicitante')} · ${dateLabel(textOf(c, 'answeredAt'), time: true)}',
                 ),
               ],
               if (production &&
@@ -331,7 +342,7 @@ class _ClarificationsPanelState extends OperationState<ClarificationsPanel> {
                 Padding(
                   padding: const EdgeInsets.symmetric(vertical: 8),
                   child: Text(
-                    'Antes: ${specificationLabel(objectOf(r['previous']))}\nDespués: ${specificationLabel(objectOf(r['current']))}\n${textOf(r, 'reason')}\nAutor: ${textOf(r, 'changedBy')} · ${dateLabel(textOf(r, 'changedAt'), time: true)}',
+                    'Antes: ${specificationLabel(objectOf(r['previous']))}\nDespués: ${specificationLabel(objectOf(r['current']))}\n${textOf(r, 'reason')}\nAutor: ${actorLabel(textOf(r, 'changedBy'), currentUserId, 'Especialista solicitante')} · ${dateLabel(textOf(r, 'changedAt'), time: true)}',
                   ),
                 ),
             ],
@@ -339,6 +350,25 @@ class _ClarificationsPanelState extends OperationState<ClarificationsPanel> {
       ],
     ),
   );
+}
+
+extension on _ClarificationsPanelState {
+  /// Item and requirement that originated the clarification.
+  String origin(JsonObject c) {
+    final request = requests[textOf(c, 'requestId')];
+    final item = request?.items
+        .where((i) => i['itemId'] == c['itemId'])
+        .firstOrNull;
+    final requirement = item == null
+        ? null
+        : objectsOf(item['requirements'])
+              .where((r) => r['requirementId'] == c['requirementId'])
+              .firstOrNull;
+    if (item == null || requirement == null) {
+      return 'Ítem y requisito de la solicitud SOL-${shortId(textOf(c, 'requestId'))}';
+    }
+    return 'Ítem: ${textOf(item, 'description')}\nRequisito: ${specificationLabel(requirement)}';
+  }
 }
 
 String specificationLabel(JsonObject r) =>

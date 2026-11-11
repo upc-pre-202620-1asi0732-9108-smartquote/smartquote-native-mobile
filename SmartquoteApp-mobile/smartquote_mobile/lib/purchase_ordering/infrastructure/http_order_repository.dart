@@ -60,8 +60,9 @@ class HttpOrderRepository implements OrderRepository {
     String runId,
     String quoteId,
     String conditions,
-    String destination,
-  ) async => PurchaseOrder(
+    String destination, {
+    int? expectedBudgetVersion,
+  }) async => PurchaseOrder(
     objectOf(
       await api.request(
         '/simulations/$runId/quotations/$quoteId/purchase-orders',
@@ -69,6 +70,9 @@ class HttpOrderRepository implements OrderRepository {
         body: {
           'deliveryConditions': conditions,
           'deliveryDestination': destination,
+          // US20: omitted by callers that did not contrast the budget; the
+          // server validates the current budget in every case.
+          'expectedBudgetVersion': ?expectedBudgetVersion,
         },
       ),
     ),

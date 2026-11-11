@@ -2,6 +2,7 @@ import '../../evaluation_simulation/domain/evaluation.dart';
 import '../../shared/domain/api_contract.dart';
 import '../domain/purchase_order.dart';
 import '../domain/corporate_profile.dart';
+import '../domain/ordering_policies.dart';
 
 class OrderingWorkflow {
   const OrderingWorkflow(this.orders, this.evaluations, this.exporter);
@@ -12,8 +13,9 @@ class OrderingWorkflow {
     String runId,
     String quotationId,
     String conditions,
-    String destination,
-  ) async {
+    String destination, {
+    BudgetCheck? check,
+  }) async {
     final run = await evaluations.getSimulation(runId);
     if (!run.current ||
         !run.evaluations.any(
@@ -24,7 +26,16 @@ class OrderingWorkflow {
         status: 409,
       );
     }
-    return orders.approve(run.id, quotationId, conditions, destination);
+    // US20: an exceeded budget blocks the approval before any order is requested;
+    // the contrasted version travels with it so an outdated check is rejected.
+    check?.assertApprovable();
+    return orders.approve(
+      run.id,
+      quotationId,
+      conditions,
+      destination,
+      expectedBudgetVersion: check?.budgetVersion,
+    );
   }
 
   Future<void> export(String orderId, CorporateProfile profile) async {
