@@ -14,6 +14,7 @@ import '../quotation_intake/presentation/quotations_panel.dart';
 import '../evaluation_simulation/presentation/simulation_panel.dart';
 import '../evaluation_simulation/presentation/distributed_purchase_panel.dart';
 import '../purchase_ordering/presentation/order_panel.dart';
+import '../evaluation_simulation/presentation/sensitivity_panel.dart';
 
 class RequestWorkspace extends StatefulWidget {
   const RequestWorkspace({
@@ -30,6 +31,8 @@ class RequestWorkspace extends StatefulWidget {
 class _RequestWorkspaceState extends OperationState<RequestWorkspace> {
   PurchaseRequest? request;
   List<JsonObject> history = [], audit = [];
+  // US22: analyst names for display; only managers can read the directory.
+  final analystNames = <String, String>{};
   int tab = 0;
   int clarificationRefresh = 0;
   bool working = false;
@@ -40,10 +43,28 @@ class _RequestWorkspaceState extends OperationState<RequestWorkspace> {
     load();
   }
 
+  String get currentUserId =>
+      textOf(widget.services.auth.session!.user, 'userId');
+  String analystName(String id) => id == currentUserId
+      ? 'Tú'
+      : analystNames[id] ?? 'Analista de compras (${shortId(id)})';
+
   Future<void> load() async {
     await perform(() async {
       request = await widget.services.requests.get(widget.requestId);
       history = await widget.services.requests.history(widget.requestId);
+      if (widget.services.auth.session!.manager && analystNames.isEmpty) {
+        try {
+          for (final user in await widget.services.requests.activeAnalysts(
+            page: 1,
+            pageSize: 100,
+          )) {
+            analystNames[textOf(user, 'userId')] = textOf(user, 'displayName');
+          }
+        } on ApiFailure {
+          // Names are optional; the role label is shown instead.
+        }
+      }
       if (widget.services.auth.session!.manager) {
         audit = await widget.services.orders.audit(
           'PurchaseRequest',
@@ -209,9 +230,9 @@ class _RequestWorkspaceState extends OperationState<RequestWorkspace> {
                       padding: const EdgeInsets.only(bottom: 12),
                       child: Text(
                         '${dateLabel(textOf(entry, 'assignedAt'), time: true)}\n'
-                        'Anterior: ${entry['previousAnalystId'] ?? 'Sin asignar'}\n'
-                        'Analista: ${textOf(entry, 'analystId')}\n'
-                        'Registrado por: ${textOf(entry, 'assignedBy')}'
+                        'Anterior: ${entry['previousAnalystId'] == null ? 'Sin asignar' : analystName(textOf(entry, 'previousAnalystId'))}\n'
+                        'Analista: ${analystName(textOf(entry, 'analystId'))}\n'
+                        'Registrado por: ${actorLabel(textOf(entry, 'assignedBy'), currentUserId, 'Jefe de compras')}'
                         '${entry['reason'] == null ? '' : '\nMotivo: ${textOf(entry, 'reason')}'}',
                       ),
                     ),
@@ -233,6 +254,9 @@ class _RequestWorkspaceState extends OperationState<RequestWorkspace> {
   @override
   Widget build(BuildContext context) {
     final session = widget.services.auth.session!;
+    // US19: only the purchase manager analyzes sensitivity.
+    final sensitivityTab =
+        session.manager && widget.services.sensitivity != null;
     final labels = [
       'Solicitud',
       if (session.purchasing) ...[
@@ -241,6 +265,7 @@ class _RequestWorkspaceState extends OperationState<RequestWorkspace> {
         'Orden',
         'Compra distribuida',
       ],
+      if (sensitivityTab) 'Sensibilidad',
       if (widget.services.workflows != null) 'Aclaraciones',
     ];
     return PopScope(
@@ -324,6 +349,15 @@ class _RequestWorkspaceState extends OperationState<RequestWorkspace> {
                         onChanged: load,
                       ),
                     ],
+                    if (sensitivityTab)
+                      SensitivityPanel(
+                        services: widget.services,
+                        request: request!,
+                        active: tab == 5,
+                        pendingCriteria: pendingCriteria,
+                        onBusy: setWorking,
+                        onChanged: load,
+                      ),
                     if (widget.services.workflows != null)
                       ClarificationsPanel(
                         key: ValueKey(
@@ -389,12 +423,14 @@ class _RequestWorkspaceState extends OperationState<RequestWorkspace> {
               Text(
                 'Prioridad: ${priorityLabels[textOf(data, 'priority')] ?? textOf(data, 'priority')}',
               ),
-              Text('Área responsable: ${textOf(data, 'nextResponsibleArea')}'),
+              Text(
+                'Área responsable: ${areaOf(textOf(data, 'nextResponsibleArea'))}',
+              ),
               if (purchasing)
                 SelectableText(
                   current.assignedAnalystId.isEmpty
                       ? 'Sin analista asignado'
-                      : 'Analista responsable: ${current.assignedAnalystId}',
+                      : 'Analista responsable: ${analystName(current.assignedAnalystId)}',
                 ),
               if (purchasing)
                 TextButton(
@@ -502,7 +538,7 @@ class _RequestWorkspaceState extends OperationState<RequestWorkspace> {
                 ListTile(
                   contentPadding: EdgeInsets.zero,
                   title: Text(
-                    '${labelOf(textOf(h, 'fromStatus'))} → ${labelOf(textOf(h, 'toStatus'))}',
+                    '${historyStatusLabel(textOf(h, 'fromStatus'), fromSchedule: data['scheduleOccurrenceId'] != null)} → ${historyStatusLabel(textOf(h, 'toStatus'), fromSchedule: data['scheduleOccurrenceId'] != null)}',
                   ),
                   subtitle: Text(
                     '${textOf(h, 'reason')}\n${dateLabel(textOf(h, 'changedAt'), time: true)} · ${textOf(h, 'changedBy')}',

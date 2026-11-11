@@ -57,7 +57,15 @@ void main() {
 
       await tester.tap(find.text('Analista activo'));
       await tester.pumpAndSettle();
-      expect(find.textContaining('Analista actual'), findsNothing);
+      // The current analyst is not offered as a destination in the dialog;
+      // the request detail behind it may show their name.
+      expect(
+        find.descendant(
+          of: find.byType(AlertDialog),
+          matching: find.textContaining('Analista actual'),
+        ),
+        findsNothing,
+      );
       await tester.tap(find.textContaining('Analista de destino').last);
       await tester.pumpAndSettle();
       await tester.tap(find.text('Confirmar'));
@@ -78,7 +86,7 @@ void main() {
         'reason': 'Redistribución de carga',
         'expectedVersion': 7,
       });
-      expect(find.text('Analista responsable: $nextAnalyst'), findsOneWidget);
+      expect(find.text('Analista responsable: Analista de destino'), findsOneWidget);
     },
   );
 

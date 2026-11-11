@@ -41,8 +41,9 @@ abstract interface class OrderRepository {
     String runId,
     String quoteId,
     String conditions,
-    String destination,
-  );
+    String destination, {
+    int? expectedBudgetVersion,
+  });
   Future<PurchaseOrder> delivered(String id);
   Future<JsonObject> evaluate(
     String id,

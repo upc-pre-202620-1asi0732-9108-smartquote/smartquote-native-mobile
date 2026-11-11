@@ -9,6 +9,7 @@ import '../identity_access/presentation/pending_page.dart';
 import '../supply_requests/presentation/request_list_page.dart';
 import '../supply_requests/presentation/notifications_page.dart';
 import '../purchase_ordering/presentation/management_page.dart';
+import '../purchase_ordering/presentation/supplier_eligibility_page.dart';
 
 class Workspace extends StatefulWidget {
   const Workspace({super.key, required this.services});
@@ -58,6 +59,12 @@ class _WorkspaceState extends State<Workspace> {
           'Proveedores',
           Icons.local_shipping_outlined,
           ManagementPage(services: widget.services),
+        ),
+      if (session.purchasing && widget.services.policies != null)
+        (
+          'Habilitación',
+          Icons.verified_outlined,
+          SupplierEligibilityPage(services: widget.services),
         ),
       if (session.manager) ...[
         (

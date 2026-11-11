@@ -162,7 +162,7 @@ class _RequestListPageState extends OperationState<RequestListPage> {
                 ),
                 subtitle: Text(
                   'SOL-${shortId(request.id)} · ${dateLabel(textOf(request.data, 'requiredDate'))}\n'
-                  '${labelOf(request.status)} · ${assignedToMe ? priorityLabels[textOf(request.data, 'priority')] ?? textOf(request.data, 'priority') : textOf(request.data, 'nextResponsibleArea')}',
+                  '${labelOf(request.status)} · ${assignedToMe ? priorityLabels[textOf(request.data, 'priority')] ?? textOf(request.data, 'priority') : areaOf(textOf(request.data, 'nextResponsibleArea'))}',
                 ),
                 isThreeLine: true,
                 trailing: const Icon(Icons.chevron_right),

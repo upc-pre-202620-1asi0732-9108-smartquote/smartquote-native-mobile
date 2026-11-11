@@ -12,6 +12,8 @@ import 'quotation_intake/infrastructure/http_quotation_repository.dart';
 import 'evaluation_simulation/infrastructure/http_evaluation_repository.dart';
 import 'purchase_ordering/infrastructure/http_order_repository.dart';
 import 'purchase_ordering/infrastructure/order_pdf.dart';
+import 'purchase_ordering/infrastructure/http_ordering_policy_repository.dart';
+import 'evaluation_simulation/infrastructure/http_sensitivity_repository.dart';
 import 'shared/infrastructure/api_client.dart';
 
 void main() {
@@ -29,6 +31,8 @@ void main() {
         auth: auth,
         workflows: HttpRequestWorkflowRepository(api),
         expiryAlerts: HttpExpiryAlertRepository(api),
+        policies: HttpOrderingPolicyRepository(api),
+        sensitivity: HttpSensitivityRepository(api),
         requests: HttpRequestRepository(api),
         quotations: HttpQuotationRepository(api),
         evaluations: HttpEvaluationRepository(api),

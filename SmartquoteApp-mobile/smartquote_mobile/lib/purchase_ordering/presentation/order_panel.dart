@@ -9,6 +9,7 @@ import '../../evaluation_simulation/domain/evaluation.dart';
 import '../../shared/presentation/form_dialog.dart';
 import '../domain/purchase_order.dart';
 import '../domain/corporate_profile.dart';
+import '../domain/ordering_policies.dart';
 import 'management_page.dart';
 
 class OrderPanel extends StatefulWidget {
@@ -41,6 +42,11 @@ class _OrderPanelState extends OperationState<OrderPanel> {
   JsonObject? deliveryEvaluation;
   final names = <String, String>{};
   CorporateProfile? corporate;
+  // US20: budget of the request and its contrast with the selected offer.
+  PurchaseBudget? budget;
+  BudgetCheck? check;
+  Object? checkError;
+  OrderingPolicyRepository? get policies => widget.services.policies;
   @override
   void initState() {
     super.initState();
@@ -54,6 +60,9 @@ class _OrderPanelState extends OperationState<OrderPanel> {
   }
 
   Future<void> fetch() async {
+    if (policies != null) {
+      budget = await policies!.budget(widget.request.id);
+    }
     try {
       order = await widget.services.orders.byRequest(widget.request.id);
       distributedAward = false;
@@ -80,8 +89,78 @@ class _OrderPanelState extends OperationState<OrderPanel> {
       names[q.id] = textOf(q.data, 'supplierBusinessName');
     }
     chooseDefault();
+    await loadCheck();
     if (order != null && widget.services.auth.session!.manager) {
       audit = await widget.services.orders.audit('PurchaseOrder', order!.id);
+    }
+  }
+
+  /// Contrasts the complete amount of the selected offer with the current
+  /// budget. A failure (for example a missing preserved exchange rate) is
+  /// shown and blocks the approval; it is never replaced by a local estimate.
+  Future<void> loadCheck() async {
+    check = null;
+    checkError = null;
+    final selectedRun = run, selectedChoice = choice;
+    if (policies == null ||
+        order != null ||
+        selectedRun == null ||
+        selectedChoice == null ||
+        !selectedRun.current) {
+      return;
+    }
+    try {
+      final result = await policies!.budgetCheck(
+        selectedRun.id,
+        selectedChoice,
+      );
+      if (run?.id == selectedRun.id && choice == selectedChoice) check = result;
+    } on ApiFailure catch (failure) {
+      if (run?.id == selectedRun.id && choice == selectedChoice) {
+        checkError = failure;
+      }
+    }
+  }
+
+  Future<void> refreshCheck() async {
+    await loadCheck();
+    if (mounted) setState(() {});
+  }
+
+  Future<void> authorizeBudget() async {
+    final configured = budget?.configured == true;
+    final values = await dataDialog(
+      context,
+      configured ? 'Registrar nuevo límite' : 'Autorizar presupuesto',
+      [
+        ('amount', 'Importe máximo en PEN', ''),
+        ('reason', 'Justificación', ''),
+      ],
+    );
+    if (values == null) return;
+    final done = await perform(() async {
+      final amount = PurchaseBudget.parseAmount(values['amount']!);
+      // Read again so the change carries the current version (0 the first time).
+      final fresh = await policies!.budget(widget.request.id);
+      budget = await policies!.authorizeBudget(
+        widget.request.id,
+        amount,
+        values['reason']!,
+        fresh.version,
+      );
+      await loadCheck();
+      return true;
+    });
+    if (done == true) {
+      notice('Presupuesto registrado como versión ${budget!.version}.');
+    } else if (mounted && policies != null) {
+      // Keep the error visible but show the budget that is actually current.
+      try {
+        final current = await policies!.budget(widget.request.id);
+        if (mounted) setState(() => budget = current);
+      } on ApiFailure {
+        // The original error already explains the failure.
+      }
     }
   }
 
@@ -122,11 +201,22 @@ class _OrderPanelState extends OperationState<OrderPanel> {
         choice!,
         result['deliveryConditions']!,
         result['deliveryDestination']!,
+        check: check,
       );
       await fetch();
       return true;
     });
     widget.onBusy(false);
+    if (done != true && mounted && policies != null) {
+      // The budget may have changed: contrast again before another attempt.
+      try {
+        final current = await policies!.budget(widget.request.id);
+        budget = current;
+        await refreshCheck();
+      } on ApiFailure {
+        // The approval error stays visible.
+      }
+    }
     if (done == true) {
       notice(
         'Orden aprobada y emitida. No se genera otra al repetir la misma decisión.',
@@ -272,6 +362,7 @@ class _OrderPanelState extends OperationState<OrderPanel> {
           ),
         ],
       ),
+      if (policies != null && budget != null) budgetCard(budget!),
       if (distributedAward)
         const Text('Consulta las órdenes en la pestaña Compra distribuida.')
       else if (order == null && run == null && !busy)
@@ -310,6 +401,7 @@ class _OrderPanelState extends OperationState<OrderPanel> {
                         );
                         choice = null;
                         chooseDefault();
+                        await loadCheck();
                       });
                     },
             ),
@@ -332,8 +424,15 @@ class _OrderPanelState extends OperationState<OrderPanel> {
                       ),
                     )
                     .toList(),
-                onChanged: busy ? null : (v) => setState(() => choice = v),
+                onChanged: busy
+                    ? null
+                    : (v) {
+                        setState(() => choice = v);
+                        refreshCheck();
+                      },
               ),
+            if (policies != null && run!.current && choice != null)
+              budgetCheckNotice(),
             if (!run!.current)
               const Text(
                 'Resultado histórico: debe ejecutarse una simulación vigente.',
@@ -345,6 +444,8 @@ class _OrderPanelState extends OperationState<OrderPanel> {
                         widget.pendingCriteria ||
                         !run!.current ||
                         choice == null ||
+                        checkError != null ||
+                        check?.exceeded == true ||
                         widget.request.status != 'Evaluation'
                     ? null
                     : approval,
@@ -372,6 +473,115 @@ class _OrderPanelState extends OperationState<OrderPanel> {
         ),
     ],
   );
+  Widget budgetCard(PurchaseBudget current) {
+    final manager = widget.services.auth.session!.manager;
+    final open =
+        order == null &&
+        !distributedAward &&
+        ![
+          'Draft',
+          'Ordered',
+          'Rejected',
+          'Cancelled',
+        ].contains(widget.request.status);
+    return InfoCard(
+      title: 'Presupuesto de la adquisición',
+      children: [
+        if (current.configured)
+          Text(
+            'Límite autorizado: ${money(current.amountPen, 'PEN')} · versión ${current.version}',
+            style: const TextStyle(fontWeight: FontWeight.bold),
+          )
+        else
+          const Text(
+            'Sin presupuesto autorizado. No equivale a un presupuesto de cero: el control presupuestal no aplica.',
+          ),
+        if (manager && open)
+          OutlinedButton(
+            onPressed: busy ? null : authorizeBudget,
+            child: Text(
+              current.configured
+                  ? 'Registrar nuevo límite'
+                  : 'Autorizar presupuesto',
+            ),
+          ),
+        if (current.revisions.isNotEmpty)
+          ExpansionTile(
+            tilePadding: EdgeInsets.zero,
+            title: Text(
+              'Versiones del presupuesto (${current.revisions.length})',
+            ),
+            children: [
+              for (final revision in current.revisions.reversed)
+                ListTile(
+                  contentPadding: EdgeInsets.zero,
+                  title: Text(
+                    'Versión ${revision['version']} · ${money(revision['amountPen'] as num?, 'PEN')}',
+                  ),
+                  subtitle: Text(
+                    '${revision['reason']}\n${dateLabel('${revision['authorizedAt']}', time: true)} · ${actorLabel('${revision['authorizedBy']}', textOf(widget.services.auth.session!.user, 'userId'), 'Jefe de compras')}',
+                  ),
+                ),
+            ],
+          ),
+      ],
+    );
+  }
+
+  Widget budgetCheckNotice() {
+    if (checkError != null) {
+      return Card(
+        color: const Color(0xfffbe9e9),
+        child: Padding(
+          padding: const EdgeInsets.all(12),
+          child: Text(
+            'No se pudo contrastar el presupuesto: $checkError La aprobación queda bloqueada.',
+          ),
+        ),
+      );
+    }
+    final current = check;
+    if (current == null) return const SizedBox.shrink();
+    final assessment = current.assessment;
+    final rate = current.exchangeRate;
+    return Card(
+      color: current.exceeded
+          ? const Color(0xfffbe9e9)
+          : current.configured
+          ? const Color(0xffeaf4ef)
+          : null,
+      child: Padding(
+        padding: const EdgeInsets.all(12),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            Text(
+              labelOf(current.status),
+              style: const TextStyle(fontWeight: FontWeight.bold),
+            ),
+            Text(
+              'Importe total: ${money(assessment['totalPen'] as num?, 'PEN')}',
+            ),
+            if (current.configured) ...[
+              Text(
+                'Límite: ${money(assessment['budgetAmountPen'] as num?, 'PEN')} · versión ${current.budgetVersion}',
+              ),
+              Text(
+                current.exceeded
+                    ? 'Exceso: ${money(assessment['excessPen'] as num?, 'PEN')}. No se puede emitir la orden.'
+                    : 'Margen disponible: ${money(assessment['marginPen'] as num?, 'PEN')}',
+              ),
+            ],
+            if (rate != null)
+              Text(
+                'Convertido con la tasa conservada en la simulación: ${rate['sourceCurrency']} → ${rate['targetCurrency']} ${rate['rate']} · ${rate['source']}',
+              ),
+          ],
+        ),
+      ),
+    );
+  }
+
   Widget orderCard(PurchaseOrder current) => InfoCard(
     title: textOf(current.data, 'orderNumber'),
     children: [
