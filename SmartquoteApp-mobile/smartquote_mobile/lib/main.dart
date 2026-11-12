@@ -1,6 +1,8 @@
 import 'package:flutter/material.dart';
 
 import 'app/services.dart';
+import 'supply_requests/infrastructure/http_request_workflow_repository.dart';
+import 'quotation_intake/infrastructure/http_expiry_alert_repository.dart';
 import 'app/workspace.dart';
 import 'identity_access/application/session_controller.dart';
 import 'identity_access/infrastructure/http_identity_repository.dart';
@@ -10,6 +12,8 @@ import 'quotation_intake/infrastructure/http_quotation_repository.dart';
 import 'evaluation_simulation/infrastructure/http_evaluation_repository.dart';
 import 'purchase_ordering/infrastructure/http_order_repository.dart';
 import 'purchase_ordering/infrastructure/order_pdf.dart';
+import 'purchase_ordering/infrastructure/http_ordering_policy_repository.dart';
+import 'evaluation_simulation/infrastructure/http_sensitivity_repository.dart';
 import 'shared/infrastructure/api_client.dart';
 
 void main() {
@@ -25,6 +29,10 @@ void main() {
     SmartQuoteApp(
       services: Services(
         auth: auth,
+        workflows: HttpRequestWorkflowRepository(api),
+        expiryAlerts: HttpExpiryAlertRepository(api),
+        policies: HttpOrderingPolicyRepository(api),
+        sensitivity: HttpSensitivityRepository(api),
         requests: HttpRequestRepository(api),
         quotations: HttpQuotationRepository(api),
         evaluations: HttpEvaluationRepository(api),

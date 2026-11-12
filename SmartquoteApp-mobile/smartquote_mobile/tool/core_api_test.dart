@@ -170,6 +170,19 @@ void main() {
       expect((await quotations.get(quote.id)).verified, true);
       quotes.add(quote.id);
     }
+    // Preparación del entorno: la política vigente exige proveedores habilitados.
+    // No representa una pantalla móvil de US18 ni sustituye sus pruebas de aceptación.
+    final suppliers = objectsOf(await manager.request('/suppliers'));
+    for (final supplier in suppliers.where((s) => s['status'] == 'Pending')) {
+      await manager.request(
+        '/suppliers/${textOf(supplier, 'id')}/enable',
+        method: 'POST',
+        body: {
+          'reason': 'Controlled supplier eligibility for mobile integration',
+          'expectedVersion': supplier['version'],
+        },
+      );
+    }
     // US06-US07: escenario real, exclusión de vigencia y versión nueva.
     final criteria = defaultCriteria(request);
     var scenario = await evaluations.save(
@@ -181,6 +194,7 @@ void main() {
     var run = await evaluations.simulate(scenario.id);
     expect(run.current, true);
     expect(run.evaluations.length, 2);
+    expect(run.recommendation, isNotNull);
     expect(run.recommendation!['quotationId'], quotes.first);
     final oldRun = run;
     criteria[1]['weight'] = 70;

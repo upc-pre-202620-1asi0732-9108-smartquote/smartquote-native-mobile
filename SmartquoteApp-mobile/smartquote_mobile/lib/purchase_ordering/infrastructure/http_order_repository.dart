@@ -23,12 +23,46 @@ class HttpOrderRepository implements OrderRepository {
   Future<PurchaseOrder> get(String id) async =>
       PurchaseOrder(objectOf(await api.request('/purchase-orders/$id')));
   @override
+  Future<PurchaseAward?> awardByRequest(String requestId) async {
+    try {
+      return PurchaseAward(
+        objectOf(
+          await api.request('/purchase-requests/$requestId/purchase-award'),
+        ),
+      );
+    } on ApiFailure catch (error) {
+      if (error.status == 404) return null;
+      rethrow;
+    }
+  }
+
+  @override
+  Future<JsonObject> distributedBudget(String runId) async => objectOf(
+    await api.request('/simulations/$runId/purchase-award-budget-check'),
+  );
+
+  @override
+  Future<PurchaseAward> approveDistributed(
+    String runId,
+    JsonObject decision,
+  ) async => PurchaseAward(
+    objectOf(
+      await api.request(
+        '/simulations/$runId/purchase-awards',
+        method: 'POST',
+        body: decision,
+        idempotencyKey: 'mobile-distributed-$runId',
+      ),
+    ),
+  );
+  @override
   Future<PurchaseOrder> approve(
     String runId,
     String quoteId,
     String conditions,
-    String destination,
-  ) async => PurchaseOrder(
+    String destination, {
+    int? expectedBudgetVersion,
+  }) async => PurchaseOrder(
     objectOf(
       await api.request(
         '/simulations/$runId/quotations/$quoteId/purchase-orders',
@@ -36,6 +70,9 @@ class HttpOrderRepository implements OrderRepository {
         body: {
           'deliveryConditions': conditions,
           'deliveryDestination': destination,
+          // US20: omitted by callers that did not contrast the budget; the
+          // server validates the current budget in every case.
+          'expectedBudgetVersion': ?expectedBudgetVersion,
         },
       ),
     ),

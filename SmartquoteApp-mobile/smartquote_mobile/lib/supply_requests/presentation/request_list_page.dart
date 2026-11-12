@@ -19,6 +19,7 @@ class _RequestListPageState extends OperationState<RequestListPage> {
   RequestPage? result;
   String filter = '';
   int page = 1;
+  bool assignedToMe = false;
   @override
   void initState() {
     super.initState();
@@ -27,7 +28,22 @@ class _RequestListPageState extends OperationState<RequestListPage> {
 
   Future<void> load() async {
     await perform(() async {
-      result = await widget.services.requests.list(status: filter, page: page);
+      final requests = widget.services.requests;
+      var response = await requests.list(
+        status: filter,
+        page: page,
+        assignedToMe: assignedToMe,
+      );
+      // A reassignment can remove the last item of the current page.
+      if (assignedToMe && response.items.isEmpty && page > 1) {
+        page = 1;
+        response = await requests.list(
+          status: filter,
+          page: page,
+          assignedToMe: true,
+        );
+      }
+      result = response;
     });
   }
 
@@ -71,6 +87,22 @@ class _RequestListPageState extends OperationState<RequestListPage> {
             label: const Text('Nueva solicitud'),
           ),
         const SizedBox(height: 16),
+        if (widget.services.auth.session!.has('PurchaseAnalyst'))
+          SwitchListTile(
+            contentPadding: EdgeInsets.zero,
+            title: const Text('Solo mis solicitudes asignadas'),
+            value: assignedToMe,
+            onChanged: busy
+                ? null
+                : (value) {
+                    setState(() {
+                      assignedToMe = value;
+                      page = 1;
+                      result = null;
+                    });
+                    load();
+                  },
+          ),
         DropdownButtonFormField<String>(
           initialValue: filter,
           isExpanded: true,
@@ -78,6 +110,7 @@ class _RequestListPageState extends OperationState<RequestListPage> {
           items:
               [
                     '',
+                    if (widget.services.auth.session!.production) 'Draft',
                     'Submitted',
                     'UnderReview',
                     'QuotationCollection',
@@ -112,7 +145,11 @@ class _RequestListPageState extends OperationState<RequestListPage> {
             child: Text('${result!.totalItems} solicitudes'),
           ),
           if (result!.items.isEmpty)
-            const Text('No hay solicitudes en este estado.'),
+            Text(
+              assignedToMe
+                  ? 'No tienes solicitudes asignadas con este filtro.'
+                  : 'No hay solicitudes en este estado.',
+            ),
           for (final request in result!.items)
             Card(
               child: ListTile(
@@ -124,7 +161,8 @@ class _RequestListPageState extends OperationState<RequestListPage> {
                   overflow: TextOverflow.ellipsis,
                 ),
                 subtitle: Text(
-                  'SOL-${shortId(request.id)} · ${dateLabel(textOf(request.data, 'requiredDate'))}\n${labelOf(request.status)} · ${textOf(request.data, 'nextResponsibleArea')}',
+                  'SOL-${shortId(request.id)} · ${dateLabel(textOf(request.data, 'requiredDate'))}\n'
+                  '${labelOf(request.status)} · ${assignedToMe ? priorityLabels[textOf(request.data, 'priority')] ?? textOf(request.data, 'priority') : areaOf(textOf(request.data, 'nextResponsibleArea'))}',
                 ),
                 isThreeLine: true,
                 trailing: const Icon(Icons.chevron_right),

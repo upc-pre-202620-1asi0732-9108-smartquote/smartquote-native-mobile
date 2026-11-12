@@ -189,7 +189,7 @@ class _QuotationsPanelState extends OperationState<QuotationsPanel> {
                   : textOf(quote.data, 'supplierBusinessName'),
             ),
             subtitle: Text(
-              '${labelOf(quote.status)} · ${money(quote.total, textOf(quote.data, 'currency'))}\n${textOf(quote.data, 'fileName')}',
+              '${quote.expired ? labelOf('Expired') : labelOf(quote.status)} · ${money(quote.total, textOf(quote.data, 'currency'))}\n${textOf(quote.data, 'fileName')}',
             ),
             isThreeLine: true,
             trailing: const Icon(Icons.chevron_right),
@@ -202,7 +202,7 @@ class _QuotationsPanelState extends OperationState<QuotationsPanel> {
           child: Text('No hay cotizaciones cargadas.'),
         ),
       if (widget.request.status == 'QuotationCollection' &&
-          quotes.where((q) => q.verified).length >= 2)
+          quotes.where((q) => q.verified && !q.expired).length >= 2)
         FilledButton(
           onPressed: busy || queue.running ? null : ready,
           child: const Text('Cotizaciones listas: pasar a evaluación'),

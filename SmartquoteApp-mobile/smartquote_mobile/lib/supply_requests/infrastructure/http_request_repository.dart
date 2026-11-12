@@ -5,19 +5,23 @@ class HttpRequestRepository implements RequestRepository {
   HttpRequestRepository(this.api);
   final ApiGateway api;
   @override
-  Future<RequestPage> list({String status = '', int page = 1}) async =>
-      RequestPage(
-        objectOf(
-          await api.request(
-            '/purchase-requests',
-            query: {
-              'page': page,
-              'pageSize': 12,
-              if (status.isNotEmpty) 'status': status,
-            },
-          ),
-        ),
-      );
+  Future<RequestPage> list({
+    String status = '',
+    int page = 1,
+    bool assignedToMe = false,
+  }) async => RequestPage(
+    objectOf(
+      await api.request(
+        '/purchase-requests',
+        query: {
+          'page': page,
+          'pageSize': 12,
+          if (status.isNotEmpty) 'status': status,
+          if (assignedToMe) 'assignedToMe': true,
+        },
+      ),
+    ),
+  );
   @override
   Future<PurchaseRequest> get(String id) async =>
       PurchaseRequest(objectOf(await api.request('/purchase-requests/$id')));
@@ -31,6 +35,46 @@ class HttpRequestRepository implements RequestRepository {
   Future<List<JsonObject>> history(String id) async => objectsOf(
     objectOf(await api.request('/purchase-requests/$id/history'))['entries'],
   );
+
+  @override
+  Future<List<JsonObject>> activeAnalysts({
+    required int page,
+    required int pageSize,
+  }) async => objectsOf(
+    await api.request(
+      '/iam/users',
+      query: {
+        'role': 'PurchaseAnalyst',
+        'status': 'Active',
+        'page': page,
+        'pageSize': pageSize,
+      },
+    ),
+  );
+
+  @override
+  Future<PurchaseRequest> assignAnalyst(
+    PurchaseRequest request,
+    String analystId, {
+    String? reason,
+  }) async => PurchaseRequest(
+    objectOf(
+      await api.request(
+        '/purchase-requests/${request.id}/assignment',
+        method: 'PUT',
+        body: {
+          'analystId': analystId,
+          'reason': reason?.trim(),
+          'expectedVersion': request.version,
+        },
+      ),
+    ),
+  );
+
+  @override
+  Future<List<JsonObject>> assignmentHistory(String id) async =>
+      objectsOf(await api.request('/purchase-requests/$id/assignment-history'));
+
   @override
   Future<void> changeStatus(
     PurchaseRequest request,

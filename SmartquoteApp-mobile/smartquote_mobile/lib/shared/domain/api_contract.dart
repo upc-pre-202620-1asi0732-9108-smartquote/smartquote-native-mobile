@@ -51,6 +51,7 @@ abstract interface class ApiGateway {
     Object? body,
     JsonObject? query,
     bool authenticated = true,
+    String? idempotencyKey,
     Duration? timeout,
     void Function(int sent, int total)? onSendProgress,
   });

@@ -56,7 +56,9 @@ class _SimulationPanelState extends OperationState<SimulationPanel> {
 
   Future<void> fetch({bool reset = false}) async {
     scenario = await widget.services.evaluations.current(widget.request.id);
-    runs = await widget.services.evaluations.history(widget.request.id);
+    runs = (await widget.services.evaluations.history(widget.request.id))
+        .where((run) => !run.distributed)
+        .toList();
     final quotes = await widget.services.quotations.list(widget.request.id);
     supplierNames.clear();
     for (final q in quotes) {

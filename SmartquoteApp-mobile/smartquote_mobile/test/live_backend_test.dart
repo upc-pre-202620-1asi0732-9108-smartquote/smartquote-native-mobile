@@ -19,6 +19,7 @@ class SmokeApi extends ApiClient {
     Object? body,
     JsonObject? query,
     bool authenticated = true,
+    String? idempotencyKey,
     Duration? timeout,
     void Function(int, int)? onSendProgress,
   }) async {
@@ -29,6 +30,7 @@ class SmokeApi extends ApiClient {
         body: body,
         query: query,
         authenticated: authenticated,
+        idempotencyKey: idempotencyKey,
         timeout: timeout,
         onSendProgress: onSendProgress,
       );

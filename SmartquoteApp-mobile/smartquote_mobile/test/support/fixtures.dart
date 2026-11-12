@@ -194,11 +194,19 @@ JsonObject sessionFixture(String role) => {
 };
 
 class Call {
-  Call(this.path, this.method, this.body, this.query, this.authenticated);
+  Call(
+    this.path,
+    this.method,
+    this.body,
+    this.query,
+    this.authenticated,
+    this.idempotencyKey,
+  );
   final String path, method;
   final Object? body;
   final JsonObject? query;
   final bool authenticated;
+  final String? idempotencyKey;
 }
 
 class TestApi implements ApiGateway {
@@ -217,10 +225,11 @@ class TestApi implements ApiGateway {
     Object? body,
     JsonObject? query,
     bool authenticated = true,
+    String? idempotencyKey,
     Duration? timeout,
     void Function(int, int)? onSendProgress,
   }) async {
-    calls.add(Call(path, method, body, query, authenticated));
+    calls.add(Call(path, method, body, query, authenticated, idempotencyKey));
     if (failures.containsKey(path)) throw failures[path]!;
     if (responses.containsKey(path)) return responses[path];
     if (path.endsWith('registration-status')) {

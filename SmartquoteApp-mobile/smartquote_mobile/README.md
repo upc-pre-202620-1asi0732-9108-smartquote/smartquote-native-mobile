@@ -72,4 +72,8 @@ En GitHub, publicar primero el backend con `tests/run-tests.ps1` y configurar **
 
 SUNAT ya se utiliza dentro de la simulación del backend. Flutter muestra la tasa/procedencia recibida; no consulta SUNAT directamente ni incluye sus credenciales.
 
+## Aclaraciones, recurrencias y vencimientos
+
+US15–US17 están conectadas a los contratos del backend. Producción accede a **Aclaraciones** y **Programaciones**; el analista dispone de **Vencimientos** y puede solicitar aclaraciones desde cada requisito de una solicitud activa. Los borradores recurrentes se editan y se envían mediante acciones separadas. Consultar [guía de escenarios, permisos y verificación](docs/us15-us16-us17.md).
+
 No almacenar contraseñas, claves OpenAI/SUNAT o claves JWT en `--dart-define`. `API_BASE_URL` y, opcionalmente, `LANDING_PAGE_URL`, `PURCHASER_NAME`, `PURCHASER_RUC`, `PURCHASER_ADDRESS` son configuración pública. Los datos corporativos también se pueden introducir al exportar; no se completan con datos ficticios.

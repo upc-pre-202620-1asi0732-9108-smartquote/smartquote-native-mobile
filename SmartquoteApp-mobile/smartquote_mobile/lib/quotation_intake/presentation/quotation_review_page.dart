@@ -72,7 +72,7 @@ class _QuotationReviewPageState extends OperationState<QuotationReviewPage> {
   Future<void> correct(JsonObject field) async {
     final result = await dataDialog(
       context,
-      'Verificar: ${fieldName(textOf(field, 'fieldPath'))}',
+      'Verificar: ${fieldTitle(textOf(field, 'fieldPath'))}',
       [
         ('value', 'Valor verificado', textOf(field, 'currentValue')),
         ('reason', 'Motivo y evidencia de la corrección', ''),
@@ -169,6 +169,12 @@ class _QuotationReviewPageState extends OperationState<QuotationReviewPage> {
               title: textOf(quote!.data, 'fileName'),
               children: [
                 StatusChip(quote!.status),
+                if (quote!.data['commercialStatus'] == 'Expired' ||
+                    (quote!.verified && quote!.data['isCurrent'] == false))
+                  const Text(
+                    'Esta oferta no está vigente para nuevas compras. Su lectura no amplía las condiciones; solicita una cotización vigente y vuelve a evaluar.',
+                    style: TextStyle(color: Color(0xffc5221f)),
+                  ),
                 Text(
                   'Proveedor: ${textOf(quote!.data, 'supplierBusinessName')}',
                 ),
@@ -317,8 +323,24 @@ class _QuotationReviewPageState extends OperationState<QuotationReviewPage> {
               .toList();
   }
 
+  /// Adds the specification name extracted for that line, when available.
+  String fieldTitle(String path) {
+    final spec = RegExp(r'^lines\[(\d+)\]\.specifications\[(\d+)\]\.')
+        .firstMatch(path);
+    if (spec == null) return fieldName(path);
+    final lines = objectsOf(quote!.data['lines']);
+    final li = int.parse(spec[1]!), si = int.parse(spec[2]!);
+    final specs = li < lines.length
+        ? objectsOf(lines[li]['specifications'])
+        : <JsonObject>[];
+    final name = si < specs.length ? textOf(specs[si], 'name') : '';
+    return name.isEmpty
+        ? fieldName(path)
+        : 'Línea ${li + 1} · Especificación: $name';
+  }
+
   Widget fieldCard(JsonObject f) => InfoCard(
-    title: fieldName(textOf(f, 'fieldPath')),
+    title: fieldTitle(textOf(f, 'fieldPath')),
     children: [
       StatusChip(textOf(f, 'status')),
       SelectableText(
@@ -343,22 +365,4 @@ class _QuotationReviewPageState extends OperationState<QuotationReviewPage> {
         ),
     ],
   );
-}
-
-String fieldName(String path) {
-  const names = {
-    'supplier.businessName': 'Razón social',
-    'supplier.taxIdentifier': 'RUC del proveedor',
-    'currency': 'Moneda',
-    'deliveryLeadTimeDays': 'Plazo de entrega (días)',
-    'validUntil': 'Válida hasta',
-  };
-  return names[path] ??
-      path
-          .replaceAll('unitPrice', 'precio unitario')
-          .replaceAll('unitOfMeasure', 'unidad')
-          .replaceAll('quantity', 'cantidad')
-          .replaceAll('description', 'descripción')
-          .replaceAll('specifications', 'especificaciones')
-          .replaceAll('lines', 'líneas');
 }
